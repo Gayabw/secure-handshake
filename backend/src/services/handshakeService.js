@@ -1,9 +1,13 @@
 import crypto from "crypto";
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
+import { checkNodePolicy } from "./policyService.js";
 import { reserveNonce, linkNonceToHandshake } from "./replayService.js";
 import { writeLog } from "./logService.js";
 
+/**
+ * Internal helper: write to replay_attacks table (evidence logging)
+ */
 async function logReplayAttack({
   replay_nonce,
   original_timestamp,
@@ -45,27 +49,73 @@ export async function initiateHandshake({
 }) {
   const now = new Date().toISOString();
 
-  // Your IDs are bigint => must be numbers
+  // ✅ IDs are bigint -> must be numbers
   const mustBeNumbers = [
     initiator_user_id,
     initiator_user_key_id,
     responder_user_id,
     responder_user_key_id,
   ];
-  if (mustBeNumbers.some((v) => typeof v !== "number")) {
+  if (mustBeNumbers.some((v) => typeof v !== "number" || Number.isNaN(v))) {
     throw new Error(
       "IDs must be numbers (bigint). Example: initiator_user_id: 1 (NOT 'SID01')."
     );
   }
+
   if (!blockchain_network) throw new Error("blockchain_network is required.");
 
+  // 🔐 POLICY CHECK (initiator)
+  const initiatorPolicy = await checkNodePolicy({
+    user_id: initiator_user_id,
+    user_key_id: initiator_user_key_id,
+  });
+
+  if (!initiatorPolicy.allowed) {
+    await writeLog({
+      event_source: "policyService",
+      event_type: "POLICY_BLOCKED",
+      log_level: "WARN",
+      subject_user_id: initiator_user_id,
+      subject_user_key_id: initiator_user_key_id,
+      details: {
+        stage: "INITIATE",
+        reason: initiatorPolicy.reason,
+        source: initiatorPolicy.source,
+      },
+    });
+    throw new Error(`Policy blocked initiator: ${initiatorPolicy.reason}`);
+  }
+
+  // 🔐 POLICY CHECK (responder)
+  const responderPolicy = await checkNodePolicy({
+    user_id: responder_user_id,
+    user_key_id: responder_user_key_id,
+  });
+
+  if (!responderPolicy.allowed) {
+    await writeLog({
+      event_source: "policyService",
+      event_type: "POLICY_BLOCKED",
+      log_level: "WARN",
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      details: {
+        stage: "INITIATE",
+        reason: responderPolicy.reason,
+        source: responderPolicy.source,
+      },
+    });
+    throw new Error(`Policy blocked responder: ${responderPolicy.reason}`);
+  }
+
+  // Nonce (initiator)
   const nonce = nonce_initiator || crypto.randomBytes(16).toString("hex");
 
   // TTL for nonce
   const ttl = Number(process.env.REPLAY_TTL_SECONDS || 300);
   const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
 
-  // 1) Reserve nonce first (replay protection)
+  // 1) Reserve nonce first (replay prevention)
   const nonceResult = await reserveNonce({
     nonce,
     first_seen_at: now,
@@ -75,7 +125,7 @@ export async function initiateHandshake({
     subject_user_key_id: initiator_user_key_id,
   });
 
-  // If nonce already exists => replay
+  // If nonce already exists => replay attempt
   if (!nonceResult.ok && nonceResult.code === "NONCE_ALREADY_USED") {
     await logReplayAttack({
       replay_nonce: nonce,
@@ -94,10 +144,14 @@ export async function initiateHandshake({
       log_level: "WARN",
       subject_user_id: initiator_user_id,
       subject_user_key_id: initiator_user_key_id,
-      details: { nonce },
+      details: { nonce, stage: "INITIATE" },
     });
 
     return { ok: false, code: "REPLAY_NONCE_REUSED" };
+  }
+
+  if (!nonceResult.ok) {
+    throw new Error("Nonce reserve failed during initiate.");
   }
 
   // 2) Insert handshake row (match your schema columns exactly)
@@ -127,8 +181,7 @@ export async function initiateHandshake({
 
   if (hsErr) throw new Error(`Handshake insert failed: ${hsErr.message}`);
 
-  // ✅ 3) Link nonce_cache row to handshake_id (THIS IS THE NEW PART)
-  // We update the exact nonce row using nonce_id returned from reserveNonce.
+  // 3) Link nonce_cache row to handshake_id (best evidence)
   if (nonceResult?.nonce_row?.nonce_id) {
     await linkNonceToHandshake({
       nonce_id: nonceResult.nonce_row.nonce_id,
@@ -160,8 +213,9 @@ export async function initiateHandshake({
  * Respond to an existing handshake.
  * - checks handshake exists and is INITIATED
  * - verifies responder ids match the handshake record
- * - reserves responder nonce in nonce_cache (replay prevention)
- * - links responder nonce row to handshake_id
+ * - enforces policy for responder
+ * - reserves responder nonce (replay prevention)
+ * - links nonce row to handshake_id
  * - updates handshake_status -> COMPLETED
  * - writes HANDSHAKE_COMPLETED log
  */
@@ -179,8 +233,11 @@ export async function respondHandshake({
     typeof responder_user_id !== "number" ||
     typeof responder_user_key_id !== "number"
   ) {
-    throw new Error("handshake_id, responder_user_id, responder_user_key_id must be numbers.");
+    throw new Error(
+      "handshake_id, responder_user_id, responder_user_key_id must be numbers."
+    );
   }
+
   if (!responder_nonce) throw new Error("responder_nonce is required.");
 
   // 1) Load handshake
@@ -194,7 +251,9 @@ export async function respondHandshake({
 
   // 2) Must be INITIATED to respond
   if (hs.handshake_status !== "INITIATED") {
-    throw new Error(`Handshake not in INITIATED state. Current: ${hs.handshake_status}`);
+    throw new Error(
+      `Handshake not in INITIATED state. Current: ${hs.handshake_status}`
+    );
   }
 
   // 3) Validate responder matches record
@@ -205,10 +264,45 @@ export async function respondHandshake({
     throw new Error("Responder user/key does not match handshake record.");
   }
 
-  // 4) Reserve responder nonce (replay protection)
+  // 🔐 POLICY CHECK (responder)
+  const responderPolicy = await checkNodePolicy({
+    user_id: responder_user_id,
+    user_key_id: responder_user_key_id,
+  });
+
+  if (!responderPolicy.allowed) {
+    await writeLog({
+      event_source: "policyService",
+      event_type: "POLICY_BLOCKED",
+      log_level: "WARN",
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      handshake_id,
+      details: {
+        stage: "RESPOND",
+        reason: responderPolicy.reason,
+        source: responderPolicy.source,
+      },
+    });
+
+    // Mark handshake failed (evidence)
+    await supabase
+      .from(TABLES.HANDSHAKES)
+      .update({
+        handshake_status: "FAILED",
+        failure_reason: "POLICY_BLOCKED",
+        completed_at: now,
+      })
+      .eq("handshake_id", handshake_id);
+
+    throw new Error(`Policy blocked responder: ${responderPolicy.reason}`);
+  }
+
+  // TTL for responder nonce
   const ttl = Number(process.env.REPLAY_TTL_SECONDS || 300);
   const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
 
+  // 4) Reserve responder nonce (replay protection)
   const nonceResult = await reserveNonce({
     nonce: responder_nonce,
     first_seen_at: now,
@@ -227,7 +321,7 @@ export async function respondHandshake({
       subject_user_id: responder_user_id,
       subject_user_key_id: responder_user_key_id,
       handshake_id,
-      details: { where: "respond", responder_nonce },
+      details: { stage: "RESPOND", responder_nonce },
     });
 
     // Mark handshake as FAILED (evidence)
@@ -247,7 +341,7 @@ export async function respondHandshake({
     throw new Error("Nonce reserve failed for responder nonce.");
   }
 
-  // 5) Link nonce_cache row to handshake_id (optional but best for evidence)
+  // 5) Link nonce_cache row to handshake_id (best evidence)
   if (nonceResult?.nonce_row?.nonce_id) {
     await linkNonceToHandshake({
       nonce_id: nonceResult.nonce_row.nonce_id,
@@ -277,7 +371,10 @@ export async function respondHandshake({
     subject_user_id: responder_user_id,
     subject_user_key_id: responder_user_key_id,
     handshake_id,
-    details: { responder_nonce, responder_nonce_expires_at: expiresAt },
+    details: {
+      responder_nonce,
+      responder_nonce_expires_at: expiresAt,
+    },
   });
 
   return { ok: true, handshake: updated };
