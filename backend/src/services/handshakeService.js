@@ -155,3 +155,130 @@ export async function initiateHandshake({
 
   return { ok: true, handshake };
 }
+
+/**
+ * Respond to an existing handshake.
+ * - checks handshake exists and is INITIATED
+ * - verifies responder ids match the handshake record
+ * - reserves responder nonce in nonce_cache (replay prevention)
+ * - links responder nonce row to handshake_id
+ * - updates handshake_status -> COMPLETED
+ * - writes HANDSHAKE_COMPLETED log
+ */
+export async function respondHandshake({
+  handshake_id,
+  responder_user_id,
+  responder_user_key_id,
+  responder_nonce,
+}) {
+  const now = new Date().toISOString();
+
+  // IDs must be numbers (bigint)
+  if (
+    typeof handshake_id !== "number" ||
+    typeof responder_user_id !== "number" ||
+    typeof responder_user_key_id !== "number"
+  ) {
+    throw new Error("handshake_id, responder_user_id, responder_user_key_id must be numbers.");
+  }
+  if (!responder_nonce) throw new Error("responder_nonce is required.");
+
+  // 1) Load handshake
+  const { data: hs, error: hsErr } = await supabase
+    .from(TABLES.HANDSHAKES)
+    .select("*")
+    .eq("handshake_id", handshake_id)
+    .single();
+
+  if (hsErr) throw new Error(`Handshake not found: ${hsErr.message}`);
+
+  // 2) Must be INITIATED to respond
+  if (hs.handshake_status !== "INITIATED") {
+    throw new Error(`Handshake not in INITIATED state. Current: ${hs.handshake_status}`);
+  }
+
+  // 3) Validate responder matches record
+  if (
+    Number(hs.responder_user_id) !== Number(responder_user_id) ||
+    Number(hs.responder_user_key_id) !== Number(responder_user_key_id)
+  ) {
+    throw new Error("Responder user/key does not match handshake record.");
+  }
+
+  // 4) Reserve responder nonce (replay protection)
+  const ttl = Number(process.env.REPLAY_TTL_SECONDS || 300);
+  const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
+
+  const nonceResult = await reserveNonce({
+    nonce: responder_nonce,
+    first_seen_at: now,
+    expires_at: expiresAt,
+    handshake_id,
+    subject_user_id: responder_user_id,
+    subject_user_key_id: responder_user_key_id,
+  });
+
+  // If responder nonce reused => replay
+  if (!nonceResult.ok && nonceResult.code === "NONCE_ALREADY_USED") {
+    await writeLog({
+      event_source: "handshakeService",
+      event_type: "REPLAY_DETECTED",
+      log_level: "WARN",
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      handshake_id,
+      details: { where: "respond", responder_nonce },
+    });
+
+    // Mark handshake as FAILED (evidence)
+    await supabase
+      .from(TABLES.HANDSHAKES)
+      .update({
+        handshake_status: "FAILED",
+        failure_reason: "REPLAY_DETECTED_ON_RESPOND",
+        completed_at: now,
+      })
+      .eq("handshake_id", handshake_id);
+
+    throw new Error("Replay detected: responder nonce already used.");
+  }
+
+  if (!nonceResult.ok) {
+    throw new Error("Nonce reserve failed for responder nonce.");
+  }
+
+  // 5) Link nonce_cache row to handshake_id (optional but best for evidence)
+  if (nonceResult?.nonce_row?.nonce_id) {
+    await linkNonceToHandshake({
+      nonce_id: nonceResult.nonce_row.nonce_id,
+      handshake_id,
+    });
+  }
+
+  // 6) Update handshake -> COMPLETED
+  const { data: updated, error: upErr } = await supabase
+    .from(TABLES.HANDSHAKES)
+    .update({
+      handshake_status: "COMPLETED",
+      completed_at: now,
+      failure_reason: null,
+    })
+    .eq("handshake_id", handshake_id)
+    .select("*")
+    .single();
+
+  if (upErr) throw new Error(`Handshake update failed: ${upErr.message}`);
+
+  // 7) Log completion
+  await writeLog({
+    event_source: "handshakeService",
+    event_type: "HANDSHAKE_COMPLETED",
+    log_level: "INFO",
+    subject_user_id: responder_user_id,
+    subject_user_key_id: responder_user_key_id,
+    handshake_id,
+    details: { responder_nonce, responder_nonce_expires_at: expiresAt },
+  });
+
+  return { ok: true, handshake: updated };
+}

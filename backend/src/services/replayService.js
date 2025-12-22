@@ -47,14 +47,16 @@ export async function reserveNonce({
   return { ok: true, nonce_row: data };
 }
 
-export async function linkNonceToHandshake({ nonce, handshake_id }) {
+
+export async function linkNonceToHandshake({ nonce_id, handshake_id }) {
   const { data, error } = await supabase
     .from(TABLES.NONCE_CACHE)
     .update({ handshake_id })
-    .eq("nonce", nonce)
+    .eq("nonce_id", nonce_id)
     .select("nonce_id, nonce, handshake_id")
-    .maybeSingle();
+    .single();
 
   if (error) throw new Error(`Link nonce to handshake failed: ${error.message}`);
   return data;
 }
+
