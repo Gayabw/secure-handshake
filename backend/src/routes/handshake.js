@@ -7,11 +7,11 @@ import { requireFields } from "../utils/validate.js";
 const router = Router();
 
 /**
- * Helper: validate positive integer id (prevents "/status" being treated as :id)
+ * Helper: validate a positive integer id
  */
 function parsePositiveInt(value) {
   const n = Number(value);
-  if (!Number.isInteger(n) || n <= 0) return null;
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return null;
   return n;
 }
 
@@ -19,30 +19,43 @@ function parsePositiveInt(value) {
  * Helper: map known service errors to correct HTTP status codes
  */
 function mapServiceErrorToHttp(e) {
-  const msg = (e?.message || "Unknown error").trim().toLowerCase();
+  const message = (e?.message || "Unknown error").trim();
+  const msg = message.toLowerCase();
 
   // Replay / nonce reuse -> 409 Conflict
-  if (msg.includes("replay detected") || msg.includes("nonce already used") || msg.includes("nonce already exists")) {
-    return { status: 409, message: e.message };
+  if (
+    msg.includes("replay detected") ||
+    msg.includes("nonce already used") ||
+    msg.includes("nonce already exists")
+  ) {
+    return { status: 409, message };
   }
 
   // Not found -> 404
   if (msg.includes("not found")) {
-    return { status: 404, message: e.message };
+    return { status: 404, message };
   }
 
   // Responder mismatch / forbidden -> 403
-  if (msg.includes("does not match handshake record") || msg.includes("does not match")) {
-    return { status: 403, message: e.message };
+  if (
+    msg.includes("does not match handshake record") ||
+    msg.includes("does not match")
+  ) {
+    return { status: 403, message };
   }
 
   // Bad request -> 400
-  if (msg.includes("required") || msg.includes("missing") || msg.includes("must be numbers")) {
-    return { status: 400, message: e.message };
+  if (
+    msg.includes("required") ||
+    msg.includes("missing") ||
+    msg.includes("must be numbers") ||
+    msg.includes("invalid")
+  ) {
+    return { status: 400, message };
   }
 
   // Default -> 500
-  return { status: 500, message: e.message || "Internal server error" };
+  return { status: 500, message: message || "Internal server error" };
 }
 
 /**
@@ -60,7 +73,9 @@ router.post("/initiate", async (req, res) => {
     ]);
 
     if (missing.length) {
-      return res.status(400).json({ ok: false, error: `Missing: ${missing.join(", ")}` });
+      return res
+        .status(400)
+        .json({ ok: false, error: `Missing: ${missing.join(", ")}` });
     }
 
     const result = await initiateHandshake({
@@ -72,7 +87,7 @@ router.post("/initiate", async (req, res) => {
       nonce_initiator: req.body.nonce_initiator ?? null,
     });
 
-    // initiateHandshake already returns ok false for replay/non-unique situations
+    // initiateHandshake returns ok:false for replay/non-unique situations
     return res.status(result.ok ? 201 : 409).json(result);
   } catch (e) {
     console.error("❌ /handshake/initiate error:", e.message);
@@ -95,7 +110,9 @@ router.post("/respond", async (req, res) => {
     ]);
 
     if (missing.length) {
-      return res.status(400).json({ ok: false, error: `Missing: ${missing.join(", ")}` });
+      return res
+        .status(400)
+        .json({ ok: false, error: `Missing: ${missing.join(", ")}` });
     }
 
     const result = await respondHandshake({
@@ -129,7 +146,7 @@ router.get("/:id/logs", async (req, res) => {
       .order("event_time", { ascending: true });
 
     if (error) return res.status(500).json({ ok: false, error: error.message });
-    return res.json({ ok: true, logs: data });
+    return res.json({ ok: true, logs: data ?? [] });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message });
   }
@@ -151,7 +168,7 @@ router.get("/:id/nonces", async (req, res) => {
       .order("first_seen_at", { ascending: true });
 
     if (error) return res.status(500).json({ ok: false, error: error.message });
-    return res.json({ ok: true, nonces: data });
+    return res.json({ ok: true, nonces: data ?? [] });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message });
   }
@@ -173,7 +190,7 @@ router.get("/:id/replay", async (req, res) => {
       .order("detected_timestamp", { ascending: true });
 
     if (error) return res.status(500).json({ ok: false, error: error.message });
-    return res.json({ ok: true, replay_attacks: data });
+    return res.json({ ok: true, replay_attacks: data ?? [] });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message });
   }
@@ -183,7 +200,7 @@ router.get("/:id/replay", async (req, res) => {
  * GET /handshake/:id
  * Fetch handshake by ID
  *
- * NOTE: This is placed LAST so it doesn't interfere with /:id/logs, /:id/nonces, /:id/replay.
+ * IMPORTANT: Keep this LAST so it doesn't interfere with /:id/logs, /:id/nonces, /:id/replay.
  */
 router.get("/:id", async (req, res) => {
   try {
