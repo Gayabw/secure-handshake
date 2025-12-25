@@ -4,6 +4,12 @@ import { TABLES } from "../lib/tables.js";
 import { checkNodePolicy } from "./policyService.js";
 import { reserveNonce, linkNonceToHandshake } from "./replayService.js";
 import { writeLog } from "./logService.js";
+import {
+  behaviorOnHandshakeInitiated,
+  behaviorOnHandshakeCompleted,
+  behaviorOnReplayDetected,
+  behaviorOnPolicyBlocked,
+} from "./behaviourService.js";
 
 /**
  * Internal helper: write to replay_attacks table (evidence logging)
@@ -83,6 +89,13 @@ export async function initiateHandshake({
         source: initiatorPolicy.source,
       },
     });
+
+    await behaviorOnPolicyBlocked({
+      subject_user_id: initiator_user_id,
+      subject_user_key_id: initiator_user_key_id,
+      handshake_id: null, // no handshake row yet
+    });
+
     throw new Error(`Policy blocked initiator: ${initiatorPolicy.reason}`);
   }
 
@@ -105,6 +118,13 @@ export async function initiateHandshake({
         source: responderPolicy.source,
       },
     });
+
+    await behaviorOnPolicyBlocked({
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      handshake_id: null, // no handshake row yet
+    });
+
     throw new Error(`Policy blocked responder: ${responderPolicy.reason}`);
   }
 
@@ -145,6 +165,12 @@ export async function initiateHandshake({
       subject_user_id: initiator_user_id,
       subject_user_key_id: initiator_user_key_id,
       details: { nonce, stage: "INITIATE" },
+    });
+
+    await behaviorOnReplayDetected({
+      subject_user_id: initiator_user_id,
+      subject_user_key_id: initiator_user_key_id,
+      handshake_id: null, // no handshake row yet
     });
 
     return { ok: false, code: "REPLAY_NONCE_REUSED" };
@@ -206,19 +232,17 @@ export async function initiateHandshake({
     },
   });
 
+  // ✅ Phase G Step 05: pass handshake_id for anomaly evidence linking
+  await behaviorOnHandshakeInitiated({
+    subject_user_id: initiator_user_id,
+    subject_user_key_id: initiator_user_key_id,
+    handshake_id: handshake.handshake_id,
+  });
+
   return { ok: true, handshake };
 }
 
-/**
- * Respond to an existing handshake.
- * - checks handshake exists and is INITIATED
- * - verifies responder ids match the handshake record
- * - enforces policy for responder
- * - reserves responder nonce (replay prevention)
- * - links nonce row to handshake_id
- * - updates handshake_status -> COMPLETED
- * - writes HANDSHAKE_COMPLETED log
- */
+/* Respond to an existing handshake. */
 export async function respondHandshake({
   handshake_id,
   responder_user_id,
@@ -295,6 +319,20 @@ export async function respondHandshake({
       })
       .eq("handshake_id", handshake_id);
 
+    await behaviorOnPolicyBlocked({
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      handshake_id,
+    });
+
+    // handshake failed because of policy
+    await behaviorOnHandshakeCompleted({
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      ok: false,
+      handshake_id,
+    });
+
     throw new Error(`Policy blocked responder: ${responderPolicy.reason}`);
   }
 
@@ -333,6 +371,20 @@ export async function respondHandshake({
         completed_at: now,
       })
       .eq("handshake_id", handshake_id);
+
+    await behaviorOnReplayDetected({
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      handshake_id,
+    });
+
+    // handshake failed because of replay
+    await behaviorOnHandshakeCompleted({
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      ok: false,
+      handshake_id,
+    });
 
     throw new Error("Replay detected: responder nonce already used.");
   }
@@ -375,6 +427,22 @@ export async function respondHandshake({
       responder_nonce,
       responder_nonce_expires_at: expiresAt,
     },
+  });
+
+  // Responder completed successfully
+  await behaviorOnHandshakeCompleted({
+    subject_user_id: responder_user_id,
+    subject_user_key_id: responder_user_key_id,
+    ok: true,
+    handshake_id,
+  });
+
+  // Initiator also counts as successful handshake partner
+  await behaviorOnHandshakeCompleted({
+    subject_user_id: hs.initiator_user_id,
+    subject_user_key_id: hs.initiator_user_key_id,
+    ok: true,
+    handshake_id,
   });
 
   return { ok: true, handshake: updated };
