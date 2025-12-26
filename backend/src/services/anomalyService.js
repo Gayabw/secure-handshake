@@ -2,16 +2,17 @@
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { writeLog } from "./logService.js";
+import { recommendMitigation } from "./mitigationService.js";
 
 /**
- * Phase G: Rule-based anomaly detection foundation (placeholder for GA/ML later)
- * - Reads latest behavior_profile for a node
- * - Computes rule-based anomaly_score
- * - If score >= threshold:
- *    1) insert into anomalies (unless deduped)
- *    2) write event_logs: ANOMALY_DETECTED (link anomaly_id)
+ * Phase G — Anomaly Detection Engine (Rule-based)
+ * Phase H — Mitigation Recommendation Hook (Human-in-the-loop)
  *
- * FAIL-SAFE: never throws to callers (returns safe result).
+ * Design principles:
+ * - Evidence-first
+ * - Fail-safe (never breaks handshake)
+ * - Minimal coupling
+ * - GA/ML-ready
  */
 
 const DEFAULT_THRESHOLD = Number(process.env.ANOMALY_THRESHOLD ?? 70);
@@ -22,7 +23,7 @@ function toIso(d = new Date()) {
 }
 
 /**
- * Rule scoring from behavior_profiles (simple + explainable)
+ * Compute explainable anomaly score from behavior profile
  */
 export function computeRuleScore(profile) {
   const reasons = [];
@@ -37,7 +38,7 @@ export function computeRuleScore(profile) {
       ? null
       : Number(profile.trust_score);
 
-  // Rule 1: Replay attempts
+  // Rule 1 — Replay attempts
   if (replay >= 1) {
     score += 40;
     reasons.push({ rule: "REPLAY_ATTEMPTS", weight: 40, value: replay });
@@ -47,7 +48,7 @@ export function computeRuleScore(profile) {
     reasons.push({ rule: "REPLAY_BURST", weight: 20, value: replay });
   }
 
-  // Rule 2: Failure rate
+  // Rule 2 — Failure rate
   if (total > 0) {
     const failRate = failed / total;
     if (failRate >= 0.5) {
@@ -67,21 +68,17 @@ export function computeRuleScore(profile) {
     }
   }
 
-  // Rule 3: Policy blocks
+  // Rule 3 — Policy blocks
   if (policyBlocks >= 1) {
     score += 20;
     reasons.push({ rule: "POLICY_BLOCKED", weight: 20, value: policyBlocks });
   }
   if (policyBlocks >= 3) {
     score += 15;
-    reasons.push({
-      rule: "POLICY_BLOCK_BURST",
-      weight: 15,
-      value: policyBlocks,
-    });
+    reasons.push({ rule: "POLICY_BLOCK_BURST", weight: 15, value: policyBlocks });
   }
 
-  // Rule 4: Trust score
+  // Rule 4 — Trust score
   if (trust !== null && !Number.isNaN(trust)) {
     if (trust <= 15) {
       score += 40;
@@ -92,13 +89,13 @@ export function computeRuleScore(profile) {
     }
   }
 
-  // Rule 5: Burst volume
+  // Rule 5 — Handshake burst
   if (total >= 20) {
     score += 15;
     reasons.push({ rule: "HANDSHAKE_BURST", weight: 15, value: total });
   }
 
-  // DB-safe clamp for numeric(5,3)
+  // DB-safe clamp for numeric
   if (score < 0) score = 0;
   if (score > 99.999) score = 99.999;
   score = Number(score.toFixed(3));
@@ -115,10 +112,10 @@ export function computeRuleScore(profile) {
   };
 }
 
-/**
- * Evaluate a node (subject_user_id + subject_user_key_id).
+/*
+ * Evaluate anomaly for a node
  * - Never throws
- * - Returns { evaluated, anomaly_detected, ... }
+ * - Never blocks handshake
  */
 export async function evaluateAnomalyForSubject({
   subject_user_id,
@@ -128,14 +125,12 @@ export async function evaluateAnomalyForSubject({
 } = {}) {
   try {
     if (!subject_user_id || !subject_user_key_id) {
-      return {
-        evaluated: false,
-        anomaly_detected: false,
-        error: "missing_subject_ids",
-      };
+      return { evaluated: false, anomaly_detected: false, error: "missing_ids" };
     }
 
-    // 1) Load latest behavior profile
+    /* --------------------------------------------------
+     * 1) Load latest behavior profile
+     * -------------------------------------------------- */
     const { data: profiles, error: pErr } = await supabase
       .from(TABLES.BEHAVIOR_PROFILES)
       .select("*")
@@ -144,46 +139,41 @@ export async function evaluateAnomalyForSubject({
       .order("updated_at", { ascending: false })
       .limit(1);
 
-    if (pErr) {
-      return {
-        evaluated: false,
-        anomaly_detected: false,
-        error: "profile_read_failed",
-        details: pErr,
-      };
-    }
-
-    const profile = profiles?.[0];
-    if (!profile) {
+    if (pErr || !profiles?.length) {
       return { evaluated: false, anomaly_detected: false, error: "no_profile" };
     }
 
-    // 2) Compute score
+    const profile = profiles[0];
+
+    /* --------------------------------------------------
+     * 2) Compute score
+     * -------------------------------------------------- */
     const computed = computeRuleScore(profile);
 
-    // (Safe enrichment) Store anomaly_score on behavior profile (best-effort)
+    // Best-effort enrichment
     try {
       await supabase
         .from(TABLES.BEHAVIOR_PROFILES)
-        .update({ anomaly_score: computed.anomaly_score, updated_at: toIso() })
+        .update({
+          anomaly_score: computed.anomaly_score,
+          updated_at: toIso(),
+        })
         .eq("behavior_profile_id", profile.behavior_profile_id);
     } catch (_) {}
 
-    // 3) Below threshold => stop
     if (computed.anomaly_score < threshold) {
       return {
         evaluated: true,
         anomaly_detected: false,
-        threshold,
         anomaly_score: computed.anomaly_score,
         severity: computed.severity,
-        behavior_profile_id: profile.behavior_profile_id,
-        reasons: computed.reasons,
       };
     }
 
-    // 4) DEDUPE CHECK (must be BEFORE insert)
-    const { data: existing, error: eErr } = await supabase
+    /* --------------------------------------------------
+     * 3) Deduplication check
+     * -------------------------------------------------- */
+    const { data: existing } = await supabase
       .from(TABLES.ANOMALIES)
       .select("anomaly_id, detected_at")
       .eq("subject_user_id", subject_user_id)
@@ -193,13 +183,11 @@ export async function evaluateAnomalyForSubject({
       .order("detected_at", { ascending: false })
       .limit(1);
 
-    if (!eErr && existing?.length > 0) {
-      const lastDetected = existing[0].detected_at;
-      const minutesAgo =
-        (Date.now() - new Date(lastDetected).getTime()) / (1000 * 60);
+    if (existing?.length) {
+      const minsAgo =
+        (Date.now() - new Date(existing[0].detected_at).getTime()) / 60000;
 
-      if (minutesAgo <= DEDUPE_MINUTES) {
-        // Deduped: log evidence but DO NOT insert a new anomaly
+      if (minsAgo <= DEDUPE_MINUTES) {
         try {
           await writeLog({
             event_source: "anomalyService",
@@ -213,9 +201,6 @@ export async function evaluateAnomalyForSubject({
               deduped: true,
               anomaly_score: computed.anomaly_score,
               severity: computed.severity,
-              reasons: computed.reasons,
-              behavior_profile_id: profile.behavior_profile_id,
-              threshold,
             },
           });
         } catch (_) {}
@@ -225,17 +210,13 @@ export async function evaluateAnomalyForSubject({
           anomaly_detected: true,
           deduped: true,
           anomaly_id: existing[0].anomaly_id,
-          threshold,
-          anomaly_score: computed.anomaly_score,
-          severity: computed.severity,
-          behavior_profile_id: profile.behavior_profile_id,
-          reasons: computed.reasons,
         };
       }
     }
 
-    // 5) INSERT NEW ANOMALY (only if not deduped)
-    const now = toIso();
+    /* --------------------------------------------------
+     * 4) Insert new anomaly
+     * -------------------------------------------------- */
     const { data: inserted, error: aErr } = await supabase
       .from(TABLES.ANOMALIES)
       .insert({
@@ -248,26 +229,34 @@ export async function evaluateAnomalyForSubject({
         status: "OPEN",
         details: {
           threshold,
-          dedupe_minutes: DEDUPE_MINUTES,
           reasons: computed.reasons,
         },
-        detected_at: now,
-        resolved_at: null,
-        resolved_by_user_id: null,
+        detected_at: toIso(),
       })
       .select("anomaly_id")
       .single();
 
     if (aErr) {
-      return {
-        evaluated: true,
-        anomaly_detected: false,
-        error: "anomaly_insert_failed",
-        details: aErr,
-      };
+      return { evaluated: true, anomaly_detected: false };
     }
 
-    // 6) Write event log linked to anomaly_id (best-effort)
+    const anomaly_id = inserted.anomaly_id;
+
+    /* --------------------------------------------------
+     * 5) Phase H — Mitigation recommendation (FAIL-SAFE)
+     * -------------------------------------------------- */
+    try {
+      await recommendMitigation({
+        anomaly_id,
+        subject_user_id,
+        subject_user_key_id,
+        severity: computed.severity,
+      });
+    } catch (_) {}
+
+    /* --------------------------------------------------
+     * 6) Event logging
+     * -------------------------------------------------- */
     try {
       await writeLog({
         event_source: "anomalyService",
@@ -276,14 +265,11 @@ export async function evaluateAnomalyForSubject({
         subject_user_id,
         subject_user_key_id,
         handshake_id,
-        anomaly_id: inserted.anomaly_id,
+        anomaly_id,
         details: {
-          deduped: false,
           anomaly_score: computed.anomaly_score,
           severity: computed.severity,
           reasons: computed.reasons,
-          behavior_profile_id: profile.behavior_profile_id,
-          threshold,
         },
       });
     } catch (_) {}
@@ -291,20 +277,15 @@ export async function evaluateAnomalyForSubject({
     return {
       evaluated: true,
       anomaly_detected: true,
-      deduped: false,
-      anomaly_id: inserted.anomaly_id,
-      threshold,
+      anomaly_id,
       anomaly_score: computed.anomaly_score,
       severity: computed.severity,
-      behavior_profile_id: profile.behavior_profile_id,
-      reasons: computed.reasons,
     };
   } catch (err) {
     return {
       evaluated: false,
       anomaly_detected: false,
       error: "unexpected_error",
-      details: String(err),
     };
   }
 }

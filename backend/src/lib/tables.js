@@ -10,5 +10,7 @@ export const TABLES = {
   BEHAVIOR_PROFILES: "behavior_profiles",
   NODE_WHITELIST_BLACKLIST: "node_whitelist_blacklist",
   ACCESS_LIST: "access_list",
+  AUTO_MITIGATIONS: "auto_mitigations",
+
 
 };
