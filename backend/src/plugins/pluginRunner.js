@@ -1,5 +1,5 @@
 // src/plugins/pluginRunner.js
-import { PLUGINS } from "./index.js";
+import { PLUGINS_BY_STAGE, PLUGINS } from "./index.js";
 import { PluginDecision } from "./pluginTypes.js";
 import { writeLog } from "../services/logService.js";
 
@@ -9,22 +9,34 @@ import { writeLog } from "../services/logService.js";
  *
  * @param {object} params
  * @param {"pre_handshake" | "post_handshake"} params.stage
- * @param {object} params.context - plugin context (handshake/user/node metadata etc.)
- * @param {object} params.logContext - optional IDs for event_logs linkage
+ * @param {object} params.context
+ * @param {object} params.logContext
  * @param {number|null} params.logContext.handshake_id
  * @param {number|null} params.logContext.anomaly_id
  * @param {number|null} params.logContext.subject_user_id
  * @param {number|null} params.logContext.subject_user_key_id
  * @param {string|null} params.logContext.ip_address
  */
-export async function runPlugins({
-  stage,
-  context = {},
-  logContext = {},
-}) {
+export async function runPlugins({ stage, context = {}, logContext = {} }) {
   const results = [];
 
-  const stagePlugins = PLUGINS.filter((p) => p?.stage === stage);
+  // ✅ Stage-aware selection (NO top-level `stage` usage = no crash)
+  // Prefer PLUGINS_BY_STAGE, fallback to PLUGINS.
+  const stagePlugins = Array.isArray(PLUGINS_BY_STAGE?.[stage])
+    ? PLUGINS_BY_STAGE[stage]
+    : Array.isArray(PLUGINS)
+      ? PLUGINS
+      : [];
+
+  // Fail-safe: if no plugins registered for the stage, still return a safe report.
+  if (!stagePlugins.length) {
+    return {
+      stage,
+      overall_decision: PluginDecision.ALLOW,
+      results: [],
+      note: "NO_PLUGINS_REGISTERED_FOR_STAGE",
+    };
+  }
 
   for (const plugin of stagePlugins) {
     const startedAt = new Date().toISOString();
@@ -47,7 +59,7 @@ export async function runPlugins({
 
       results.push(result);
 
-      // Store in event_logs (schema already exists; details is jsonb)
+      // Store in event_logs (details is jsonb)
       await writeLog({
         event_source: "plugin_framework",
         event_type: "PLUGIN_EXECUTED",
@@ -90,7 +102,7 @@ export async function runPlugins({
     }
   }
 
-  // Aggregate decision (system-side policy for now):
+  // Aggregate decision:
   // - any DENY => DENY
   // - else any FLAG => FLAG
   // - else ALLOW
