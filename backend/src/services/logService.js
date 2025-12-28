@@ -1,12 +1,12 @@
-// backend/src/services/logService.js
+
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 
-/**
- * Centralized event logging service
- * - Schema-aligned with event_logs table
- * - Supports optional anomaly_id (Phase G)
- * - Backward compatible with all existing calls
+/*
+  Centralized event logging service
+  - Schema-aligned with event_logs table
+  - Supports optional anomaly_id (Phase G)
+  - Backward compatible with all existing calls
  */
 export async function writeLog({
   event_source = "backend",
@@ -15,7 +15,7 @@ export async function writeLog({
   subject_user_id = null,
   subject_user_key_id = null,
   handshake_id = null,
-  anomaly_id = null,          // ✅ Phase G support
+  anomaly_id = null,          // Phase G support
   ip_address = null,
   details = null,
 }) {
@@ -34,7 +34,7 @@ export async function writeLog({
     subject_user_id,
     subject_user_key_id,
     handshake_id,
-    anomaly_id,               // ✅ stored if provided
+    anomaly_id,               // stored if provided
 
     ip_address,
     details,                  // jsonb

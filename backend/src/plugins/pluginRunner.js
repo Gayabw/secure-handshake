@@ -1,11 +1,11 @@
-// src/plugins/pluginRunner.js
+
 import { PLUGINS_BY_STAGE, PLUGINS } from "./index.js";
 import { PluginDecision } from "./pluginTypes.js";
 import { writeLog } from "../services/logService.js";
 
 /**
  * Runs plugins for a given stage.
- * Fail-safe: never throws.
+
  *
  * @param {object} params
  * @param {"pre_handshake" | "post_handshake"} params.stage
@@ -20,7 +20,7 @@ import { writeLog } from "../services/logService.js";
 export async function runPlugins({ stage, context = {}, logContext = {} }) {
   const results = [];
 
-  // ✅ Stage-aware selection (NO top-level `stage` usage = no crash)
+  
   // Prefer PLUGINS_BY_STAGE, fallback to PLUGINS.
   const stagePlugins = Array.isArray(PLUGINS_BY_STAGE?.[stage])
     ? PLUGINS_BY_STAGE[stage]

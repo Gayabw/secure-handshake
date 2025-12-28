@@ -1,4 +1,4 @@
-// src/plugins/builtins/alwaysAllow.js
+
 import { PluginDecision } from "../pluginTypes.js";
 
 export const alwaysAllowPlugin = {

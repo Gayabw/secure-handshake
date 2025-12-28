@@ -1,9 +1,9 @@
-// src/plugins/builtins/flagUnknownNetwork.js
+
 import { PluginDecision } from "../pluginTypes.js";
 
-/**
- * Non-blocking plugin: FLAGS unknown blockchain networks.
- * Never DENY, never throws.
+/*
+  Non-blocking plugin: FLAGS unknown blockchain networks.
+  Never DENY, never throws.
  */
 export const flagUnknownNetworkPlugin = {
   name: "flagUnknownNetwork",
@@ -15,8 +15,7 @@ export const flagUnknownNetworkPlugin = {
       "goerli",
     ]);
 
-    // Your contexts: pre/post include request metadata, but the actual network
-    // is inside the original request body (safe to read).
+
     const network =
       context?.blockchain_network ||
       context?.body?.blockchain_network ||

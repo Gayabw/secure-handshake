@@ -1,12 +1,12 @@
-// backend/src/services/mitigationService.js
+
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { writeLog } from "./logService.js";
 
-/**
- * Phase H — Auto-Mitigation (Human-in-the-loop)
- * This service ONLY records mitigation decisions.
- * It does NOT enforce blocks automatically.
+/*
+  Phase H - Auto-Mitigation (Human-in-the-loop)
+  Only records mitigation decisions.
+  It does NOT enforce blocks automatically.
  */
 
 export async function recommendMitigation({
@@ -20,7 +20,7 @@ export async function recommendMitigation({
 
   const now = new Date().toISOString();
 
-  // Decide mitigation (recommendation only)
+  // Decide mitigation 
   let trigger_type = "ANOMALY_DETECTED";
   let action_taken = "NONE";
   let action_details = {
@@ -41,7 +41,7 @@ export async function recommendMitigation({
     };
   }
 
-  // Insert mitigation record (MATCHES YOUR SCHEMA)
+  // Insert mitigation record
   const { data, error } = await supabase
     .from(TABLES.AUTO_MITIGATIONS)
     .insert({
@@ -85,7 +85,7 @@ export async function recommendMitigation({
       },
     });
   } catch (_) {
-    // fail-safe
+    
   }
 
   return data;

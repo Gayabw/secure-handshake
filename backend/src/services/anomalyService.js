@@ -1,18 +1,18 @@
-// backend/src/services/anomalyService.js
+
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { writeLog } from "./logService.js";
 import { recommendMitigation } from "./mitigationService.js";
 
-/**
- * Phase G — Anomaly Detection Engine (Rule-based)
- * Phase H — Mitigation Recommendation Hook (Human-in-the-loop)
- *
- * Design principles:
- * - Evidence-first
- * - Fail-safe (never breaks handshake)
- * - Minimal coupling
- * - GA/ML-ready
+/*
+  Phase G — Anomaly Detection Engine (Rule-based)
+  Phase H — Mitigation Recommendation Hook (Human-in-the-loop)
+ 
+ Design principles:
+  - Evidence-first
+  - Fail-safe (never breaks handshake)
+  - Minimal coupling
+  - GA/ML-ready
  */
 
 const DEFAULT_THRESHOLD = Number(process.env.ANOMALY_THRESHOLD ?? 70);
@@ -22,8 +22,8 @@ function toIso(d = new Date()) {
   return new Date(d).toISOString();
 }
 
-/**
- * Compute explainable anomaly score from behavior profile
+/*
+  Compute explainable anomaly score from behavior profile
  */
 export function computeRuleScore(profile) {
   const reasons = [];
@@ -113,9 +113,9 @@ export function computeRuleScore(profile) {
 }
 
 /*
- * Evaluate anomaly for a node
- * - Never throws
- * - Never blocks handshake
+  Evaluate anomaly for a node
+  - Never throws
+  - Never blocks handshake
  */
 export async function evaluateAnomalyForSubject({
   subject_user_id,
@@ -128,9 +128,9 @@ export async function evaluateAnomalyForSubject({
       return { evaluated: false, anomaly_detected: false, error: "missing_ids" };
     }
 
-    /* --------------------------------------------------
-     * 1) Load latest behavior profile
-     * -------------------------------------------------- */
+    /* 
+      1) Load latest behavior profile
+    */
     const { data: profiles, error: pErr } = await supabase
       .from(TABLES.BEHAVIOR_PROFILES)
       .select("*")
@@ -145,12 +145,12 @@ export async function evaluateAnomalyForSubject({
 
     const profile = profiles[0];
 
-    /* --------------------------------------------------
-     * 2) Compute score
-     * -------------------------------------------------- */
+    /* 
+      2) Compute score
+    */
     const computed = computeRuleScore(profile);
 
-    // Best-effort enrichment
+    
     try {
       await supabase
         .from(TABLES.BEHAVIOR_PROFILES)
@@ -170,9 +170,9 @@ export async function evaluateAnomalyForSubject({
       };
     }
 
-    /* --------------------------------------------------
-     * 3) Deduplication check
-     * -------------------------------------------------- */
+    /* 
+      3) Deduplication check
+    */
     const { data: existing } = await supabase
       .from(TABLES.ANOMALIES)
       .select("anomaly_id, detected_at")
@@ -214,9 +214,9 @@ export async function evaluateAnomalyForSubject({
       }
     }
 
-    /* --------------------------------------------------
-     * 4) Insert new anomaly
-     * -------------------------------------------------- */
+    /* 
+      4) Insert new anomaly
+    */
     const { data: inserted, error: aErr } = await supabase
       .from(TABLES.ANOMALIES)
       .insert({
@@ -242,9 +242,9 @@ export async function evaluateAnomalyForSubject({
 
     const anomaly_id = inserted.anomaly_id;
 
-    /* --------------------------------------------------
-     * 5) Phase H — Mitigation recommendation (FAIL-SAFE)
-     * -------------------------------------------------- */
+    /* 
+      5) Phase H — Mitigation recommendation (FAIL-SAFE)
+    */
     try {
       await recommendMitigation({
         anomaly_id,
@@ -254,9 +254,9 @@ export async function evaluateAnomalyForSubject({
       });
     } catch (_) {}
 
-    /* --------------------------------------------------
-     * 6) Event logging
-     * -------------------------------------------------- */
+    /* 
+      6) Event logging
+    */
     try {
       await writeLog({
         event_source: "anomalyService",

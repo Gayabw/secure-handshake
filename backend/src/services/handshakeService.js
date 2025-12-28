@@ -11,8 +11,8 @@ import {
   behaviorOnPolicyBlocked,
 } from "./behaviourService.js";
 
-/**
- * Internal helper: write to replay_attacks table (evidence logging)
+/*
+  Internal helper: write to replay_attacks table (evidence logging)
  */
 async function logReplayAttack({
   replay_nonce,
@@ -42,8 +42,8 @@ async function logReplayAttack({
   if (error) throw new Error(`Replay attack log failed: ${error.message}`);
 }
 
-/**
- * Initiate handshake using your Supabase schema (handshakes + nonce_cache + event_logs).
+/*
+ * Initiate handshake using Supabase schema (handshakes + nonce_cache + event_logs).
  */
 export async function initiateHandshake({
   initiator_user_id,
@@ -55,7 +55,7 @@ export async function initiateHandshake({
 }) {
   const now = new Date().toISOString();
 
-  // ✅ IDs are bigint -> must be numbers
+  // IDs are bigint 
   const mustBeNumbers = [
     initiator_user_id,
     initiator_user_key_id,
@@ -70,7 +70,7 @@ export async function initiateHandshake({
 
   if (!blockchain_network) throw new Error("blockchain_network is required.");
 
-  // 🔐 POLICY CHECK (initiator)
+  //  POLICY CHECK (initiator)
   const initiatorPolicy = await checkNodePolicy({
     user_id: initiator_user_id,
     user_key_id: initiator_user_key_id,
@@ -99,7 +99,7 @@ export async function initiateHandshake({
     throw new Error(`Policy blocked initiator: ${initiatorPolicy.reason}`);
   }
 
-  // 🔐 POLICY CHECK (responder)
+  //  POLICY CHECK (responder)
   const responderPolicy = await checkNodePolicy({
     user_id: responder_user_id,
     user_key_id: responder_user_key_id,
@@ -180,7 +180,7 @@ export async function initiateHandshake({
     throw new Error("Nonce reserve failed during initiate.");
   }
 
-  // 2) Insert handshake row (match your schema columns exactly)
+  // 2) Insert handshake row 
   const handshakePayload = {
     initiator_user_id,
     initiator_user_key_id,
@@ -232,7 +232,7 @@ export async function initiateHandshake({
     },
   });
 
-  // ✅ Phase G Step 05: pass handshake_id for anomaly evidence linking
+  // Phase G Step 05: pass handshake_id for anomaly evidence linking
   await behaviorOnHandshakeInitiated({
     subject_user_id: initiator_user_id,
     subject_user_key_id: initiator_user_key_id,
@@ -251,7 +251,7 @@ export async function respondHandshake({
 }) {
   const now = new Date().toISOString();
 
-  // IDs must be numbers (bigint)
+  // IDs must be numbers
   if (
     typeof handshake_id !== "number" ||
     typeof responder_user_id !== "number" ||
@@ -273,7 +273,7 @@ export async function respondHandshake({
 
   if (hsErr) throw new Error(`Handshake not found: ${hsErr.message}`);
 
-  // 2) Must be INITIATED to respond
+  // 2) INITIATED to respond
   if (hs.handshake_status !== "INITIATED") {
     throw new Error(
       `Handshake not in INITIATED state. Current: ${hs.handshake_status}`
@@ -288,7 +288,7 @@ export async function respondHandshake({
     throw new Error("Responder user/key does not match handshake record.");
   }
 
-  // 🔐 POLICY CHECK (responder)
+  // POLICY CHECK (responder)
   const responderPolicy = await checkNodePolicy({
     user_id: responder_user_id,
     user_key_id: responder_user_key_id,

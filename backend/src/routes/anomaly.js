@@ -1,13 +1,13 @@
-// backend/src/routes/anomaly.js
+
 import express from "express";
 import { evaluateAnomalyForSubject } from "../services/anomalyService.js";
 
 const router = express.Router();
 
-/**
- * Manual evaluate endpoint (evidence driven)
- * POST /anomaly/evaluate
- * body: { subject_user_id, subject_user_key_id, handshake_id?, threshold? }
+/*
+  Manual evaluate endpoint (evidence driven)
+  POST /anomaly/evaluate
+  body: { subject_user_id, subject_user_key_id, handshake_id?, threshold? }
  */
 router.post("/evaluate", async (req, res) => {
   const { subject_user_id, subject_user_key_id, handshake_id = null, threshold = undefined } = req.body || {};

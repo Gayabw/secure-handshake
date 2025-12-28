@@ -3,10 +3,10 @@ import { PluginDecision } from "../pluginTypes.js";
 import { supabase } from "../../lib/supabase.js";
 import { TABLES } from "../../lib/tables.js";
 
-/**
- * Flags if too many handshake requests come from the same IP in a short window.
- * Uses event_logs evidence.
- * FAIL-SAFE: on DB issues, returns FLAG.
+/*
+ Flags if too many handshake requests come from the same IP in a short window.
+ Uses event_logs evidence.
+ FAIL-SAFE: on DB issues, returns FLAG.
  */
 export const flagRapidHandshakeBurstPlugin = {
   name: "flagRapidHandshakeBurst",

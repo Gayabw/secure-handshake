@@ -1,7 +1,7 @@
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 
-// just for auditing and the dashboard viewings.
+// This is only for auditing and the dashboard viewings.
 export async function nonceExists(nonce) {
   const { data, error } = await supabase
     .from(TABLES.NONCE_CACHE)

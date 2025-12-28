@@ -1,24 +1,24 @@
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 
-/**
- * Check if a node (user + key) is allowed to participate in handshake
- *
- * Priority:
- * 1) node_whitelist_blacklist (hard allow/deny)
- * 2) access_list (rule-based allow/deny)
- * 3) default allow
+/*
+  Check if a node (user + key) is allowed to participate in handshake
+ 
+  Priority:
+  1) node_whitelist_blacklist (hard allow/deny)
+  2) access_list (rule-based allow/deny)
+  3) default allow
  */
 export async function checkNodePolicy({ user_id, user_key_id }) {
   const nowIso = new Date().toISOString();
 
-  /**
-   * 1️⃣ HARD POLICY: node_whitelist_blacklist
-   * - Use latest ACTIVE rule (latest rule wins)
-   * - Active = expires_at is null OR expires_at > now
-   * - Status:
-   *   - BLACKLIST => block
-   *   - WHITELIST => allow
+  /*
+    1️ HARD POLICY: node_whitelist_blacklist
+    - Use latest ACTIVE rule (latest rule wins)
+    - Active = expires_at is null OR expires_at > now
+    - Status:
+      - BLACKLIST => block
+      - WHITELIST => allow
    */
   const { data: wbRows, error: wbErr } = await supabase
     .from(TABLES.NODE_WHITELIST_BLACKLIST)
@@ -52,12 +52,12 @@ export async function checkNodePolicy({ user_id, user_key_id }) {
     // If status is unknown, do NOT block by default; continue to access_list
   }
 
-  /**
-   * 2️⃣ RULE-BASED POLICY: access_list
-   * Active rule = is_active=true AND valid_from <= now AND (valid_until is null OR > now)
-   * list_type:
-   * - DENY => block
-   * - ALLOW => allow
+  /*
+   2️ RULE-BASED POLICY: access_list
+    Active rule = is_active=true AND valid_from <= now AND (valid_until is null OR > now)
+    list_type:
+    - DENY => block
+    - ALLOW => allow
    */
   const { data: accessRows, error: accessErr } = await supabase
     .from(TABLES.ACCESS_LIST)
@@ -87,8 +87,8 @@ export async function checkNodePolicy({ user_id, user_key_id }) {
     };
   }
 
-  /**
-   * 3️⃣ Default allow
+  /*
+    3️ Default allow
    */
   return { allowed: true, source: "default" };
 }

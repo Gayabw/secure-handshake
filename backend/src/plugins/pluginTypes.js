@@ -1,4 +1,3 @@
-// src/plugins/pluginTypes.js
 
 export const PluginDecision = Object.freeze({
   ALLOW: "ALLOW",
@@ -6,20 +5,20 @@ export const PluginDecision = Object.freeze({
   FLAG: "FLAG",
 });
 
-/**
+/*
  * Expected plugin output:
- * {
- *   decision: "ALLOW" | "DENY" | "FLAG",
- *   reason: string,
- *   details?: object
- * }
+  {
+    decision: "ALLOW" | "DENY" | "FLAG",
+    reason: string,
+    details?: object
+  }
  */
 
-/**
- * Expected plugin shape:
- * {
- *   name: string,
- *   stage: "pre_handshake" | "post_handshake",
- *   run: async (context) => PluginResult
- * }
+/*
+  Expected plugin shape:
+  {
+    name: string,
+    stage: "pre_handshake" | "post_handshake",
+    run: async (context) => PluginResult
+  }
  */

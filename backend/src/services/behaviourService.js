@@ -1,12 +1,11 @@
-// backend/src/services/behaviourService.js
+
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { evaluateAnomalyForSubject } from "./anomalyService.js";
 
-/**
- * Phase G (Step 05):
- * After behavior profile upsert, evaluate anomaly (rule-based foundation).
- * Must be FAIL-SAFE: NEVER throw and NEVER break main flows.
+/*
+  Phase G (Step 05):
+  After behavior profile upsert, evaluate anomaly (rule-based foundation).
  */
 
 function clamp(n, min, max) {
@@ -29,16 +28,16 @@ function computeTrustScore({
   return clamp(Math.round(trust), 0, 100);
 }
 
-/**
- * Update / upsert behavior profile for a node (subject_user_id + subject_user_key_id)
- * - Minimal + stable
- * - Supports optional handshake_id for anomaly evidence linking (non-breaking)
+/*
+  Update / upsert behavior profile for a node (subject_user_id + subject_user_key_id)
+  Supports optional handshake_id for anomaly evidence linking (non-breaking)
  */
-export async function updateBehaviorProfile({
+
+  export async function updateBehaviorProfile({
   subject_user_id,
   subject_user_key_id,
   deltas = {},
-  handshake_id = null, // OPTIONAL (Phase G integration) - does not break existing callers
+  handshake_id = null, 
 }) {
   // Required identity
   if (subject_user_id == null || subject_user_key_id == null) return;
@@ -129,11 +128,11 @@ export async function updateBehaviorProfile({
 
   if (upsertErr) {
     console.error("Behavior profile upsert error:", upsertErr);
-    return; // IMPORTANT: do not run anomaly eval if profile write failed
+    return; 
   }
 
-  // ✅ Phase G Step 05: anomaly evaluation (FAIL-SAFE)
-  // Must NEVER crash handshake endpoints.
+  // Phase G Step 05: anomaly evaluation 
+
   try {
     await evaluateAnomalyForSubject({
       subject_user_id,
@@ -142,15 +141,15 @@ export async function updateBehaviorProfile({
     });
   } catch (err) {
     // intentionally ignored
-    // evidence services must never disrupt core handshake lifecycle
+    // evidence services will not disrupt core handshake lifecycle. 
   }
 }
 
-// Exports must match handshakeService.js imports
+// Exports match handshakeService.js imports
 export async function behaviorOnHandshakeInitiated({
   subject_user_id,
   subject_user_key_id,
-  handshake_id = null, // OPTIONAL (non-breaking)
+  handshake_id = null, 
 }) {
   return updateBehaviorProfile({
     subject_user_id,
@@ -164,7 +163,7 @@ export async function behaviorOnHandshakeCompleted({
   subject_user_id,
   subject_user_key_id,
   ok,
-  handshake_id = null, // OPTIONAL (non-breaking)
+  handshake_id = null, 
 }) {
   return updateBehaviorProfile({
     subject_user_id,
@@ -177,7 +176,7 @@ export async function behaviorOnHandshakeCompleted({
 export async function behaviorOnReplayDetected({
   subject_user_id,
   subject_user_key_id,
-  handshake_id = null, // OPTIONAL (non-breaking)
+  handshake_id = null, 
 }) {
   return updateBehaviorProfile({
     subject_user_id,
@@ -190,7 +189,7 @@ export async function behaviorOnReplayDetected({
 export async function behaviorOnPolicyBlocked({
   subject_user_id,
   subject_user_key_id,
-  handshake_id = null, // OPTIONAL (non-breaking)
+  handshake_id = null, 
 }) {
   return updateBehaviorProfile({
     subject_user_id,

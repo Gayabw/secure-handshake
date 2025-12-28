@@ -3,10 +3,10 @@ import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
-// This endpoint only checks if backend can talk to Supabase
+// Checks if backend can talk to Supabase
 router.get("/ping", async (req, res) => {
   try {
-    // Replace "users" with a table you definitely have
+    
     const { data, error } = await supabase.from("users").select("user_id").limit(1);
 
     if (error) {

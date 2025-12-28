@@ -7,7 +7,11 @@ import { runPlugins } from "../plugins/pluginRunner.js";
 
 const router = Router();
 
-/* -------------------- Plugin helpers (SAFE, ADDITIVE) -------------------- */
+/*
+  Validate a positive integer id
+ */
+
+/* Plugin helpers  */
 
 function getClientIp(req) {
   const xf = req.headers["x-forwarded-for"];
@@ -62,13 +66,18 @@ function buildPostHandshakeContext({ req, action, body, handshake_id, outcome })
   };
 }
 
-/* -------------------- Helpers (existing logic preserved) -------------------- */
+/*Helpers (existing logic preserved) */
+
 
 function parsePositiveInt(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return null;
   return n;
 }
+
+/*
+  Map known service errors to correct HTTP status codes
+ */
 
 function mapServiceErrorToHttp(e) {
   const message = (e?.message || "Unknown error").trim();
@@ -102,7 +111,12 @@ function mapServiceErrorToHttp(e) {
   return { status: 500, message: message || "Internal server error" };
 }
 
-/* -------------------- POST /handshake/initiate -------------------- */
+/*
+  POST /handshake/initiate
+  Creates a new handshake (INITIATED)
+ */
+
+/* OST /handshake/initiate */
 
 router.post("/initiate", async (req, res) => {
   try {
@@ -118,7 +132,7 @@ router.post("/initiate", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Missing: ${missing.join(", ")}` });
     }
 
-    /* ===== Phase D Step 2: PRE-HANDSHAKE PLUGIN HOOK (NON-BLOCKING) ===== */
+    /* Phase D Step 2: PRE-HANDSHAKE PLUGIN HOOK (NON-BLOCKING) */
     const ip_address = getClientIp(req);
 
     const pluginContext = buildPreHandshakeContext({
@@ -132,16 +146,16 @@ router.post("/initiate", async (req, res) => {
       stage: "pre_handshake",
       context: pluginContext,
       logContext: {
-        handshake_id: null,        // ✅ PRE: always NULL (FK-safe)
+        handshake_id: null,        // PRE: always NULL 
         anomaly_id: null,
-        subject_user_id: null,     // ✅ PRE: always NULL (FK-safe)
-        subject_user_key_id: null, // ✅ PRE: always NULL (FK-safe)
+        subject_user_id: null,     // PRE: always NULL 
+        subject_user_key_id: null, // PRE: always NULL 
         ip_address,
       },
     });
 
     req.pluginReport = pluginReport;
-    /* ================================================================ */
+    
 
     const result = await initiateHandshake({
       initiator_user_id: Number(req.body.initiator_user_id),
@@ -152,8 +166,8 @@ router.post("/initiate", async (req, res) => {
       nonce_initiator: req.body.nonce_initiator ?? null,
     });
 
-    /* ===== Phase D Step 3: POST-HANDSHAKE PLUGIN HOOK (FAIL-SAFE) ===== */
-    // Only run post plugins when the handshake was created successfully (we have a real handshake_id).
+    /* Phase D Step 3: POST-HANDSHAKE PLUGIN HOOK  */
+    // Only run post plugins when the handshake was created successfully.
     if (result?.ok && result?.handshake_id) {
       const createdHandshakeId = Number(result.handshake_id);
 
@@ -170,7 +184,7 @@ router.post("/initiate", async (req, res) => {
           stage: "post_handshake",
           context: postContext,
           logContext: {
-            handshake_id: createdHandshakeId, // ✅ POST: real FK-safe id
+            handshake_id: createdHandshakeId, //  POST: real FK-safe id
             anomaly_id: null,
             subject_user_id: null,
             subject_user_key_id: null,
@@ -196,7 +210,7 @@ router.post("/initiate", async (req, res) => {
   }
 });
 
-/* -------------------- POST /handshake/respond -------------------- */
+/*  POST /handshake/respond */
 
 router.post("/respond", async (req, res) => {
   try {
@@ -211,7 +225,7 @@ router.post("/respond", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Missing: ${missing.join(", ")}` });
     }
 
-    /* ===== Phase D Step 2: PRE-HANDSHAKE PLUGIN HOOK (NON-BLOCKING) ===== */
+    /* Phase D Step 2: PRE-HANDSHAKE PLUGIN HOOK (NON-BLOCKING) */
     const ip_address = getClientIp(req);
     const handshake_id = Number(req.body.handshake_id);
 
@@ -219,23 +233,23 @@ router.post("/respond", async (req, res) => {
       req,
       action: "respond",
       body: req.body,
-      handshake_id, // keep in JSON context (forensics), but NOT in FK column
+      handshake_id, 
     });
 
     const pluginReport = await runPlugins({
       stage: "pre_handshake",
       context: pluginContext,
       logContext: {
-        handshake_id: null,        // ✅ PRE: always NULL (FK-safe even if fake id)
+        handshake_id: null,        // PRE: always NULL (FK-safe even if fake id)
         anomaly_id: null,
-        subject_user_id: null,     // ✅ PRE: always NULL
-        subject_user_key_id: null, // ✅ PRE: always NULL
+        subject_user_id: null,     // PRE: always NULL
+        subject_user_key_id: null, // PRE: always NULL
         ip_address,
       },
     });
 
     req.pluginReport = pluginReport;
-    /* ================================================================ */
+    
 
     const result = await respondHandshake({
       handshake_id,
@@ -244,7 +258,7 @@ router.post("/respond", async (req, res) => {
       responder_nonce: req.body.responder_nonce,
     });
 
-    /* ===== Phase D Step 3: POST-HANDSHAKE PLUGIN HOOK (FAIL-SAFE) ===== */
+    /* Phase D Step 3: POST-HANDSHAKE PLUGIN HOOK */
     // Only run post plugins when respond succeeded (handshake exists + state updated).
     if (result?.ok) {
       const postContext = buildPostHandshakeContext({
@@ -260,7 +274,7 @@ router.post("/respond", async (req, res) => {
           stage: "post_handshake",
           context: postContext,
           logContext: {
-            handshake_id, // ✅ POST: FK-safe if respond succeeded
+            handshake_id, // POST: FK-safe if respond succeeded
             anomaly_id: null,
             subject_user_id: null,
             subject_user_key_id: null,
@@ -275,7 +289,7 @@ router.post("/respond", async (req, res) => {
         );
       }
     }
-    /* ================================================================ */
+    
 
     return res.status(200).json(result);
   } catch (e) {
@@ -285,7 +299,7 @@ router.post("/respond", async (req, res) => {
   }
 });
 
-/* -------------------- READ-ONLY ROUTES (UNCHANGED) -------------------- */
+/* READ-ONLY ROUTES */
 
 router.get("/:id/logs", async (req, res) => {
   try {

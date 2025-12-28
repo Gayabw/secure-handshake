@@ -3,9 +3,9 @@ import { PluginDecision } from "../pluginTypes.js";
 import { supabase } from "../../lib/supabase.js";
 import { TABLES } from "../../lib/tables.js";
 
-/**
- * Flags if a nonce was seen recently too many times.
- * FAIL-SAFE: if DB fails, returns FLAG with PLUGIN_ERROR .
+/*
+  Flags if a nonce was seen recently too many times.
+  FAIL-SAFE: if DB fails, returns FLAG with PLUGIN_ERROR .
  */
 export const flagRepeatNoncePlugin = {
   name: "flagRepeatNonce",
