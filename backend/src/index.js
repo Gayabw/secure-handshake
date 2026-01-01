@@ -7,12 +7,26 @@ import anomalyRoutes from "./routes/anomaly.js";
 import { supabase } from "./lib/supabase.js";
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
+
+app.options("/", cors());
+
 app.use(express.json());
 
 app.get("/health", (req, res) => {
-  res.json({ status: "OK", service: "Secure Handshake Backend" });
+  res.json({
+    ok: true,
+    service: "Secure Handshake Backend",
+    time: new Date().toISOString(),
+  });
 });
+
 
 app.use("/db", db);
 app.use("/handshake", handshake);
