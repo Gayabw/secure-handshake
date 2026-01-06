@@ -2,21 +2,24 @@ import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { initiateHandshake, respondHandshake } from "../services/handshakeService.js";
+import { correlateAndScoreHandshake } from "../services/behaviourCorrelationService.js";
 import { requireFields } from "../utils/validate.js";
 import { runPlugins } from "../plugins/pluginRunner.js";
 
 const router = Router();
 
-/*
-  Validate a positive integer id
- */
-
-/* Plugin helpers  */
+/* Helpers */
 
 function getClientIp(req) {
   const xf = req.headers["x-forwarded-for"];
   if (typeof xf === "string" && xf.length > 0) return xf.split(",")[0].trim();
   return req.ip || req.connection?.remoteAddress || null;
+}
+
+function parsePositiveInt(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return null;
+  return n;
 }
 
 function buildPreHandshakeContext({ req, action, body, handshake_id = null }) {
@@ -66,19 +69,10 @@ function buildPostHandshakeContext({ req, action, body, handshake_id, outcome })
   };
 }
 
-/*Helpers (existing logic preserved) */
-
-
-function parsePositiveInt(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return null;
-  return n;
-}
-
 /*
-  Map known service errors to correct HTTP status codes
- */
-
+  Map known service errors to HTTP status codes.
+  Kept this strict so clients get consistent responses.
+*/
 function mapServiceErrorToHttp(e) {
   const message = (e?.message || "Unknown error").trim();
   const msg = message.toLowerCase();
@@ -89,6 +83,10 @@ function mapServiceErrorToHttp(e) {
     msg.includes("nonce already exists")
   ) {
     return { status: 409, message };
+  }
+
+  if (msg.includes("policy blocked")) {
+    return { status: 403, message };
   }
 
   if (msg.includes("not found")) {
@@ -111,12 +109,7 @@ function mapServiceErrorToHttp(e) {
   return { status: 500, message: message || "Internal server error" };
 }
 
-/*
-  POST /handshake/initiate
-  Creates a new handshake (INITIATED)
- */
-
-/* OST /handshake/initiate */
+/* POST /initiate */
 
 router.post("/initiate", async (req, res) => {
   try {
@@ -132,31 +125,29 @@ router.post("/initiate", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Missing: ${missing.join(", ")}` });
     }
 
-    /* Phase D Step 2: PRE-HANDSHAKE PLUGIN HOOK (NON-BLOCKING) */
     const ip_address = getClientIp(req);
 
-    const pluginContext = buildPreHandshakeContext({
+    // Phase D: pre-handshake plugins (FK-safe)
+    const preContext = buildPreHandshakeContext({
       req,
       action: "initiate",
       body: req.body,
       handshake_id: null,
     });
 
-    const pluginReport = await runPlugins({
+    await runPlugins({
       stage: "pre_handshake",
-      context: pluginContext,
+      context: preContext,
       logContext: {
-        handshake_id: null,        // PRE: always NULL 
+        handshake_id: null,
         anomaly_id: null,
-        subject_user_id: null,     // PRE: always NULL 
-        subject_user_key_id: null, // PRE: always NULL 
+        subject_user_id: null,
+        subject_user_key_id: null,
         ip_address,
       },
     });
 
-    req.pluginReport = pluginReport;
-    
-
+    // Core service call (creates handshake row)
     const result = await initiateHandshake({
       initiator_user_id: Number(req.body.initiator_user_id),
       initiator_user_key_id: Number(req.body.initiator_user_key_id),
@@ -166,41 +157,39 @@ router.post("/initiate", async (req, res) => {
       nonce_initiator: req.body.nonce_initiator ?? null,
     });
 
-    /* Phase D Step 3: POST-HANDSHAKE PLUGIN HOOK  */
-    // Only run post plugins when the handshake was created successfully.
-    if (result?.ok && result?.handshake_id) {
-      const createdHandshakeId = Number(result.handshake_id);
+    // Handshake id lives inside result.handshake
+    const createdHandshakeId = result?.ok ? Number(result?.handshake?.handshake_id) : null;
 
+    // Phase D: post-handshake plugins (only if created)
+    if (result?.ok && Number.isFinite(createdHandshakeId) && createdHandshakeId > 0) {
       const postContext = buildPostHandshakeContext({
         req,
         action: "initiate",
         body: req.body,
         handshake_id: createdHandshakeId,
-        outcome: { ok: true, status: result.status ?? "INITIATED" },
+        outcome: { ok: true, status: "INITIATED" },
       });
 
       try {
-        const postReport = await runPlugins({
+        await runPlugins({
           stage: "post_handshake",
           context: postContext,
           logContext: {
-            handshake_id: createdHandshakeId, //  POST: real FK-safe id
+            handshake_id: createdHandshakeId,
             anomaly_id: null,
             subject_user_id: null,
             subject_user_key_id: null,
             ip_address,
           },
         });
-        req.postPluginReport = postReport;
       } catch (err) {
-        // Fail-safe: never break handshake for plugin issues
-        console.warn(
-          "⚠️ post_handshake plugins failed (initiate):",
-          err?.message || err
-        );
+        // Plugins must never block handshake initiation
+        console.warn("⚠️ post_handshake plugins failed (initiate):", err?.message || err);
       }
+
+      // IMPORTANT: do not correlate on initiate (prevents double scoring).
+      // Correlation happens once, after respond, when outcome is final.
     }
-    /* ================================================================ */
 
     return res.status(result.ok ? 201 : 409).json(result);
   } catch (e) {
@@ -210,9 +199,14 @@ router.post("/initiate", async (req, res) => {
   }
 });
 
-/*  POST /handshake/respond */
+/*  POST /respond */
 
 router.post("/respond", async (req, res) => {
+  const ip_address = getClientIp(req);
+
+  // We keep handshake_id visible here so even failure paths can correlate.
+  const handshake_id = parsePositiveInt(req.body?.handshake_id);
+
   try {
     const missing = requireFields(req.body, [
       "handshake_id",
@@ -225,32 +219,31 @@ router.post("/respond", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Missing: ${missing.join(", ")}` });
     }
 
-    /* Phase D Step 2: PRE-HANDSHAKE PLUGIN HOOK (NON-BLOCKING) */
-    const ip_address = getClientIp(req);
-    const handshake_id = Number(req.body.handshake_id);
+    if (!handshake_id) {
+      return res.status(400).json({ ok: false, error: "Invalid handshake_id" });
+    }
 
-    const pluginContext = buildPreHandshakeContext({
+    // Phase D: pre-handshake plugins (FK-safe: do not log handshake_id yet)
+    const preContext = buildPreHandshakeContext({
       req,
       action: "respond",
       body: req.body,
-      handshake_id, 
+      handshake_id,
     });
 
-    const pluginReport = await runPlugins({
+    await runPlugins({
       stage: "pre_handshake",
-      context: pluginContext,
+      context: preContext,
       logContext: {
-        handshake_id: null,        // PRE: always NULL (FK-safe even if fake id)
+        handshake_id: null,
         anomaly_id: null,
-        subject_user_id: null,     // PRE: always NULL
-        subject_user_key_id: null, // PRE: always NULL
+        subject_user_id: null,
+        subject_user_key_id: null,
         ip_address,
       },
     });
 
-    req.pluginReport = pluginReport;
-    
-
+    // Core service call (may throw on replay/policy/state errors)
     const result = await respondHandshake({
       handshake_id,
       responder_user_id: Number(req.body.responder_user_id),
@@ -258,48 +251,62 @@ router.post("/respond", async (req, res) => {
       responder_nonce: req.body.responder_nonce,
     });
 
-    /* Phase D Step 3: POST-HANDSHAKE PLUGIN HOOK */
-    // Only run post plugins when respond succeeded (handshake exists + state updated).
+    // Phase D: post-handshake plugins (only if respond succeeded)
     if (result?.ok) {
       const postContext = buildPostHandshakeContext({
         req,
         action: "respond",
         body: req.body,
         handshake_id,
-        outcome: { ok: true, status: result.status ?? "COMPLETED" },
+        outcome: { ok: true, status: "COMPLETED" },
       });
 
       try {
-        const postReport = await runPlugins({
+        await runPlugins({
           stage: "post_handshake",
           context: postContext,
           logContext: {
-            handshake_id, // POST: FK-safe if respond succeeded
+            handshake_id,
             anomaly_id: null,
             subject_user_id: null,
             subject_user_key_id: null,
             ip_address,
           },
         });
-        req.postPluginReport = postReport;
       } catch (err) {
-        console.warn(
-          "⚠️ post_handshake plugins failed (respond):",
-          err?.message || err
-        );
+        // Plugins must never break a successful handshake
+        console.warn("⚠️ post_handshake plugins failed (respond):", err?.message || err);
+      }
+
+      // Phase E: correlate after plugins (success path)
+      try {
+        await correlateAndScoreHandshake(handshake_id);
+      } catch (err) {
+        // Correlation is non-blocking by design
+        console.warn("⚠️ behaviour correlation failed (success path):", err?.message || err);
       }
     }
-    
 
     return res.status(200).json(result);
   } catch (e) {
     console.error("❌ /handshake/respond error:", e.message);
+
+    // Phase E: best-effort correlation even on failure paths (replay/policy/etc.)
+    // This must never change the HTTP error response.
+    if (handshake_id) {
+      try {
+        await correlateAndScoreHandshake(handshake_id);
+      } catch (corrErr) {
+        console.warn("⚠️ behaviour correlation skipped on failure:", corrErr?.message || corrErr);
+      }
+    }
+
     const mapped = mapServiceErrorToHttp(e);
     return res.status(mapped.status).json({ ok: false, error: mapped.message });
   }
 });
 
-/* READ-ONLY ROUTES */
+/* READ-ONLY API */
 
 router.get("/:id/logs", async (req, res) => {
   try {
@@ -307,7 +314,7 @@ router.get("/:id/logs", async (req, res) => {
     if (!id) return res.status(400).json({ ok: false, error: "Invalid handshake_id" });
 
     const { data, error } = await supabase
-      .from(TABLES.LOGS)
+      .from(TABLES.EVENT_LOGS)
       .select("*")
       .eq("handshake_id", id)
       .order("event_time", { ascending: true });
@@ -372,5 +379,31 @@ router.get("/:id", async (req, res) => {
     return res.status(500).json({ ok: false, error: e.message });
   }
 });
+
+// GET /handshake/list?limit=50&org_id=1&status=COMPLETED
+router.get("/list", async (req, res) => {
+  try {
+    const limit = parsePositiveInt(req.query.limit) ?? 50;
+    const org_id = parsePositiveInt(req.query.org_id);
+    const status = req.query.status ? String(req.query.status).toUpperCase() : null;
+
+    let q = supabase
+      .from(TABLES.HANDSHAKES)
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (org_id) q = q.eq("org_id", org_id);
+    if (status) q = q.eq("handshake_status", status);
+
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+
+    return res.json({ ok: true, items: data ?? [] });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 
 export default router;

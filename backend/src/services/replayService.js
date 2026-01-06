@@ -19,6 +19,7 @@ export async function reserveNonce({
   handshake_id = null,
   subject_user_id = null,
   subject_user_key_id = null,
+  org_id = null, // explicit write; trigger remains a safety net
   first_seen_at,
   expires_at,
 }) {
@@ -29,6 +30,7 @@ export async function reserveNonce({
     handshake_id,
     subject_user_id,
     subject_user_key_id,
+    org_id,
     first_seen_at,
     expires_at,
     created_at: now,
@@ -37,7 +39,7 @@ export async function reserveNonce({
   const { data, error } = await supabase
     .from(TABLES.NONCE_CACHE)
     .insert(payload)
-    .select("nonce_id, nonce, first_seen_at, expires_at")
+    .select("nonce_id, nonce, first_seen_at, expires_at, org_id")
     .single();
 
   // 23505 = unique violation => nonce already exists => replay
@@ -47,16 +49,14 @@ export async function reserveNonce({
   return { ok: true, nonce_row: data };
 }
 
-
 export async function linkNonceToHandshake({ nonce_id, handshake_id }) {
   const { data, error } = await supabase
     .from(TABLES.NONCE_CACHE)
     .update({ handshake_id })
     .eq("nonce_id", nonce_id)
-    .select("nonce_id, nonce, handshake_id")
+    .select("nonce_id, nonce, handshake_id, org_id")
     .single();
 
   if (error) throw new Error(`Link nonce to handshake failed: ${error.message}`);
   return data;
 }
-

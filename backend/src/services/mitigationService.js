@@ -1,13 +1,27 @@
-
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { writeLog } from "./logService.js";
 
 /*
   Phase H - Auto-Mitigation (Human-in-the-loop)
-  Only records mitigation decisions.
-  It does NOT enforce blocks automatically.
- */
+  Records recommended actions only.
+  Does NOT enforce blocks automatically.
+*/
+
+async function resolveOrgIdForSubject(subject_user_id) {
+  try {
+    const { data, error } = await supabase
+      .from(TABLES.USERS)
+      .select("org_id")
+      .eq("user_id", subject_user_id)
+      .single();
+
+    if (error) return null;
+    return data?.org_id ?? null;
+  } catch (_) {
+    return null;
+  }
+}
 
 export async function recommendMitigation({
   anomaly_id,
@@ -15,33 +29,23 @@ export async function recommendMitigation({
   subject_user_key_id,
   severity,
 }) {
-  // Hard safety checks
   if (!anomaly_id || !subject_user_id || !subject_user_key_id) return;
 
   const now = new Date().toISOString();
+  const org_id = await resolveOrgIdForSubject(subject_user_id);
 
-  // Decide mitigation 
   let trigger_type = "ANOMALY_DETECTED";
   let action_taken = "NONE";
-  let action_details = {
-    message: "No mitigation required",
-  };
+  let action_details = { message: "No mitigation required" };
 
   if (severity === "HIGH") {
     action_taken = "RECOMMEND_BLACKLIST";
-    action_details = {
-      reason: "High severity anomaly detected",
-      confidence: "HIGH",
-    };
+    action_details = { reason: "High severity anomaly detected", confidence: "HIGH" };
   } else if (severity === "MEDIUM") {
     action_taken = "RECOMMEND_MONITOR";
-    action_details = {
-      reason: "Medium severity anomaly detected",
-      confidence: "MEDIUM",
-    };
+    action_details = { reason: "Medium severity anomaly detected", confidence: "MEDIUM" };
   }
 
-  // Insert mitigation record
   const { data, error } = await supabase
     .from(TABLES.AUTO_MITIGATIONS)
     .insert({
@@ -60,6 +64,8 @@ export async function recommendMitigation({
       created_at: now,
       created_by_system: true,
       overridden_by_user_id: null,
+
+      org_id: org_id ?? null,
     })
     .select("*")
     .single();
@@ -69,7 +75,6 @@ export async function recommendMitigation({
     return;
   }
 
-  // Evidence log (non-blocking)
   try {
     await writeLog({
       event_source: "mitigationService",
@@ -78,15 +83,9 @@ export async function recommendMitigation({
       subject_user_id,
       subject_user_key_id,
       anomaly_id,
-      details: {
-        trigger_type,
-        action_taken,
-        action_details,
-      },
+      details: { trigger_type, action_taken, action_details },
     });
-  } catch (_) {
-    
-  }
+  } catch (_) {}
 
   return data;
 }
