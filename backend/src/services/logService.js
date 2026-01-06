@@ -1,5 +1,3 @@
-
-
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 
@@ -7,34 +5,60 @@ import { TABLES } from "../lib/tables.js";
   Centralized event logging service
 
   Enterprise rules:
-  - event_logs.org_id is always populated when possible
+  - event_logs.org_id is populated whenever possible
   - Resolution priority:
-      1) explicit org_id (if caller provides)
+      1) explicit org_id (caller provides)
       2) subject_user_id -> users.org_id
       3) handshake_id -> handshakes.org_id
+      4) anomaly_id -> anomalies.org_id
+  - Fail-safe: logging should never crash core flows because a lookup failed
 */
 
-async function resolveOrgId({ org_id, subject_user_id, handshake_id }) {
-  if (org_id) return org_id;
+function isPositiveInt(v) {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0;
+}
 
-  if (subject_user_id) {
-    const { data } = await supabase
-      .from(TABLES.USERS)
-      .select("org_id")
-      .eq("user_id", subject_user_id)
-      .single();
+async function resolveOrgId({ org_id, subject_user_id, handshake_id, anomaly_id }) {
+  // 1) Explicit org_id wins
+  if (isPositiveInt(org_id)) return Number(org_id);
 
-    if (data?.org_id) return data.org_id;
-  }
+  // Best-effort lookups only
+  try {
+    // 2) Subject -> users.org_id
+    if (isPositiveInt(subject_user_id)) {
+      const { data, error } = await supabase
+        .from(TABLES.USERS)
+        .select("org_id")
+        .eq("user_id", Number(subject_user_id))
+        .maybeSingle();
 
-  if (handshake_id) {
-    const { data } = await supabase
-      .from(TABLES.HANDSHAKES)
-      .select("org_id")
-      .eq("handshake_id", handshake_id)
-      .single();
+      if (!error && isPositiveInt(data?.org_id)) return Number(data.org_id);
+    }
 
-    if (data?.org_id) return data.org_id;
+    // 3) Handshake -> handshakes.org_id
+    if (isPositiveInt(handshake_id)) {
+      const { data, error } = await supabase
+        .from(TABLES.HANDSHAKES)
+        .select("org_id")
+        .eq("handshake_id", Number(handshake_id))
+        .maybeSingle();
+
+      if (!error && isPositiveInt(data?.org_id)) return Number(data.org_id);
+    }
+
+    // 4) Anomaly -> anomalies.org_id
+    if (isPositiveInt(anomaly_id)) {
+      const { data, error } = await supabase
+        .from(TABLES.ANOMALIES)
+        .select("org_id")
+        .eq("anomaly_id", Number(anomaly_id))
+        .maybeSingle();
+
+      if (!error && isPositiveInt(data?.org_id)) return Number(data.org_id);
+    }
+  } catch (_) {
+    // swallow lookup failures (logging must remain non-blocking)
   }
 
   return null;
@@ -61,10 +85,12 @@ export async function writeLog({
 
   const now = new Date().toISOString();
 
+  // Resolve org_id best-effort (never blocks)
   const resolvedOrgId = await resolveOrgId({
     org_id,
     subject_user_id,
     handshake_id,
+    anomaly_id,
   });
 
   const payload = {
@@ -79,7 +105,7 @@ export async function writeLog({
     anomaly_id,
 
     ip_address,
-    details,
+    details, // jsonb
     created_at: now,
 
     org_id: resolvedOrgId,
