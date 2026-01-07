@@ -1,7 +1,6 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-
 import db from "./routes/db.js";
 import handshake from "./routes/handshake.js";
 import anomalyRoutes from "./routes/anomaly.js";
@@ -12,6 +11,9 @@ import devRoutes from "./routes/dev.js";
 
 import otpRoutes from "./routes/otpRoutes.js";
 import { startOtpCleanupWorker } from "./workers/otpCleanupWorker.js";
+import aliasRoutes from "./routes/aliases.js";
+import metricsRoutes from "./routes/metrics.js";
+
 
 import { supabase } from "./lib/supabase.js";
 
@@ -44,6 +46,8 @@ app.use("/behaviour", behaviourRoutes);
 app.use("/event-logs", eventLogsRoutes);
 app.use("/replay-attacks", replayAttacksRoutes);
 app.use("/dev", devRoutes);
+app.use("/", aliasRoutes);
+app.use("/metrics", metricsRoutes);
 
 app.use("/otp", otpRoutes);
 

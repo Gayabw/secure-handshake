@@ -3,6 +3,7 @@ import { alwaysAllowPlugin } from "./builtins/alwaysAllow.js";
 import { flagUnknownNetworkPlugin } from "./builtins/flagUnknownNetwork.js";
 import { flagRepeatNoncePlugin } from "./builtins/flagRepeatNonce.js";
 import { flagRapidHandshakeBurstPlugin } from "./builtins/flagRapidHandshakeBurst.js";
+import { devForcePluginErrorPlugin } from "./builtins/devForcePluginError.js";
 
 
 /*
@@ -17,14 +18,17 @@ export const PLUGINS_BY_STAGE = {
     flagUnknownNetworkPlugin,
     flagRepeatNoncePlugin,
     flagRapidHandshakeBurstPlugin,
+    devForcePluginErrorPlugin,
   ],
   post_handshake: [
     alwaysAllowPlugin,
     flagUnknownNetworkPlugin,
     flagRepeatNoncePlugin,
     flagRapidHandshakeBurstPlugin,
+    devForcePluginErrorPlugin,
   ],
 };
+
 
 /*
   Backward compatibility registry.
@@ -34,5 +38,6 @@ export const PLUGINS = [
   flagUnknownNetworkPlugin,
   flagRepeatNoncePlugin,
   flagRapidHandshakeBurstPlugin,
+  devForcePluginErrorPlugin, 
 ];
 

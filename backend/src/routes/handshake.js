@@ -42,6 +42,11 @@ function buildPreHandshakeContext({ req, action, body, handshake_id = null }) {
       null,
     handshake_id,
     timestamp: new Date().toISOString(),
+    debug:
+      process.env.NODE_ENV !== "production"
+        ? { force_plugin_error: Boolean(body?.debug?.force_plugin_error) }
+        : undefined,
+
   };
 }
 
@@ -66,6 +71,11 @@ function buildPostHandshakeContext({ req, action, body, handshake_id, outcome })
     handshake_id,
     outcome, // { ok: boolean, status?: string, error?: string }
     timestamp: new Date().toISOString(),
+    debug:
+      process.env.NODE_ENV !== "production"
+        ? { force_plugin_error: Boolean(body?.debug?.force_plugin_error) }
+        : undefined,
+
   };
 }
 
@@ -184,7 +194,7 @@ router.post("/initiate", async (req, res) => {
         });
       } catch (err) {
         // Plugins must never block handshake initiation
-        console.warn("⚠️ post_handshake plugins failed (initiate):", err?.message || err);
+        console.warn(" post_handshake plugins failed (initiate):", err?.message || err);
       }
 
       // IMPORTANT: do not correlate on initiate (prevents double scoring).
@@ -193,7 +203,7 @@ router.post("/initiate", async (req, res) => {
 
     return res.status(result.ok ? 201 : 409).json(result);
   } catch (e) {
-    console.error("❌ /handshake/initiate error:", e.message);
+    console.error(" /handshake/initiate error:", e.message);
     const mapped = mapServiceErrorToHttp(e);
     return res.status(mapped.status).json({ ok: false, error: mapped.message });
   }
@@ -275,7 +285,7 @@ router.post("/respond", async (req, res) => {
         });
       } catch (err) {
         // Plugins must never break a successful handshake
-        console.warn("⚠️ post_handshake plugins failed (respond):", err?.message || err);
+        console.warn(" post_handshake plugins failed (respond):", err?.message || err);
       }
 
       // Phase E: correlate after plugins (success path)
@@ -283,13 +293,13 @@ router.post("/respond", async (req, res) => {
         await correlateAndScoreHandshake(handshake_id);
       } catch (err) {
         // Correlation is non-blocking by design
-        console.warn("⚠️ behaviour correlation failed (success path):", err?.message || err);
+        console.warn(" behaviour correlation failed (success path):", err?.message || err);
       }
     }
 
     return res.status(200).json(result);
   } catch (e) {
-    console.error("❌ /handshake/respond error:", e.message);
+    console.error(" /handshake/respond error:", e.message);
 
     // Phase E: best-effort correlation even on failure paths (replay/policy/etc.)
     // This must never change the HTTP error response.
@@ -297,7 +307,7 @@ router.post("/respond", async (req, res) => {
       try {
         await correlateAndScoreHandshake(handshake_id);
       } catch (corrErr) {
-        console.warn("⚠️ behaviour correlation skipped on failure:", corrErr?.message || corrErr);
+        console.warn(" behaviour correlation skipped on failure:", corrErr?.message || corrErr);
       }
     }
 
