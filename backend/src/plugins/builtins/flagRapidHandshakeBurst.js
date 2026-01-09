@@ -27,12 +27,19 @@ export const flagRapidHandshakeBurstPlugin = {
     const FLAG_THRESHOLD = 10;
 
     const since = new Date(Date.now() - WINDOW_SECONDS * 1000).toISOString();
+        const table = TABLES?.EVENT_LOGS;
+
+    if (typeof table !== "string" || table.trim() === "") {
+      return {
+        decision: PluginDecision.FLAG,
+        reason: "TABLE_NOT_CONFIGURED",
+        details: { key: "EVENT_LOGS", got: table ?? null },
+      };
+    }
 
     try {
-      // Count plugin framework executions for this IP recently
-      // Avoids needing to know every handshake event_type.
       const { count, error } = await supabase
-        .from(TABLES.LOGS)
+        .from(table)
         .select("event_log_id", { count: "exact", head: true })
         .eq("ip_address", ip)
         .eq("event_source", "plugin_framework")
@@ -72,5 +79,6 @@ export const flagRapidHandshakeBurstPlugin = {
         details: { message: e?.message || String(e), ip },
       };
     }
+    
   },
 };
