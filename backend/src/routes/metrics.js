@@ -2,11 +2,13 @@ import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { parsePositiveInt } from "../lib/query.js";
+import { checkRole } from "../middleware/checkRole.js";
+import { ROLE_ACCESS } from "../config/rbac.js";
 
 const router = Router();
 
 // GET /metrics/overview?org_id=1
-router.get("/overview", async (req, res) => {
+router.get("/overview", checkRole(ROLE_ACCESS.METRICS), async (req, res) => {
   try {
     const org_id = parsePositiveInt(req.query.org_id, "org_id");
 

@@ -4,12 +4,106 @@ import { TABLES } from "../lib/tables.js";
 import { checkNodePolicy } from "./policyService.js";
 import { reserveNonce, linkNonceToHandshake } from "./replayService.js";
 import { writeLog } from "./logService.js";
+import { enforceReplayAutoBlock } from "./autoBlockService.js";
 import {
   behaviorOnHandshakeInitiated,
   behaviorOnHandshakeCompleted,
   behaviorOnReplayDetected,
   behaviorOnPolicyBlocked,
 } from "./behaviourService.js";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isRetryableLogError(error) {
+  if (!error) return false;
+
+  const message = String(
+    error.message || error.details || error.hint || error.code || error
+  ).toLowerCase();
+
+  return (
+    message.includes("fetch failed") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("socket") ||
+    message.includes("econnreset") ||
+    message.includes("econnrefused") ||
+    message.includes("etimedout") ||
+    message.includes("503") ||
+    message.includes("502") ||
+    message.includes("500")
+  );
+}
+
+async function safeWriteLog(payload, context = "event_log") {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      await writeLog(payload);
+      return { ok: true };
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === 1 && isRetryableLogError(error)) {
+        console.warn(`[${context}] log retry after temporary failure`);
+        await sleep(300);
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  console.warn(`[${context}] log skipped:`, lastError?.message || lastError);
+
+  return {
+    ok: false,
+    skipped: true,
+    error: lastError,
+  };
+}
+
+function fireAndForget(task, context = "async_task") {
+  Promise.resolve()
+    .then(task)
+    .catch((error) => {
+      console.warn(`[${context}] skipped:`, error?.message || error);
+    });
+}
+
+async function safeBehaviorOnHandshakeCompleted(payload, context) {
+  try {
+    await behaviorOnHandshakeCompleted(payload);
+  } catch (error) {
+    console.warn(`[${context}] skipped:`, error?.message || error);
+  }
+}
+
+async function safeBehaviorOnHandshakeInitiated(payload, context) {
+  try {
+    await behaviorOnHandshakeInitiated(payload);
+  } catch (error) {
+    console.warn(`[${context}] skipped:`, error?.message || error);
+  }
+}
+
+async function safeBehaviorOnReplayDetected(payload, context) {
+  try {
+    await behaviorOnReplayDetected(payload);
+  } catch (error) {
+    console.warn(`[${context}] skipped:`, error?.message || error);
+  }
+}
+
+async function safeBehaviorOnPolicyBlocked(payload, context) {
+  try {
+    await behaviorOnPolicyBlocked(payload);
+  } catch (error) {
+    console.warn(`[${context}] skipped:`, error?.message || error);
+  }
+}
 
 /* ---------- helpers ---------- */
 
@@ -92,73 +186,81 @@ export async function initiateHandshake({
 
   const org_id = await getOrgIdForNodeUser(initiator_user_id);
 
-  // POLICY (initiator)
   const initiatorPolicy = await checkNodePolicy({
     user_id: initiator_user_id,
     user_key_id: initiator_user_key_id,
   });
 
   if (!initiatorPolicy.allowed) {
-    await writeLog({
-      event_source: "policyService",
-      event_type: "POLICY_BLOCKED",
-      log_level: "WARN",
-      subject_user_id: initiator_user_id,
-      subject_user_key_id: initiator_user_key_id,
-      org_id,
-      details: {
-        stage: "INITIATE",
-        reason: initiatorPolicy.reason,
-        source: initiatorPolicy.source,
+    await safeWriteLog(
+      {
+        event_source: "policyService",
+        event_type: "POLICY_BLOCKED",
+        log_level: "WARN",
+        subject_user_id: initiator_user_id,
+        subject_user_key_id: initiator_user_key_id,
+        org_id,
+        details: {
+          stage: "INITIATE",
+          reason: initiatorPolicy.reason,
+          source: initiatorPolicy.source,
+        },
       },
-    });
+      "initiate_policy_blocked_initiator"
+    );
 
-    await behaviorOnPolicyBlocked({
-      subject_user_id: initiator_user_id,
-      subject_user_key_id: initiator_user_key_id,
-      handshake_id: null,
-    });
+    await safeBehaviorOnPolicyBlocked(
+      {
+        subject_user_id: initiator_user_id,
+        subject_user_key_id: initiator_user_key_id,
+        handshake_id: null,
+      },
+      "initiate_policy_blocked_initiator_behavior"
+    );
 
     throw new Error(`Policy blocked initiator: ${initiatorPolicy.reason}`);
   }
 
-  // POLICY (responder)
   const responderPolicy = await checkNodePolicy({
     user_id: responder_user_id,
     user_key_id: responder_user_key_id,
   });
 
   if (!responderPolicy.allowed) {
-    await writeLog({
-      event_source: "policyService",
-      event_type: "POLICY_BLOCKED",
-      log_level: "WARN",
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      org_id: await getOrgIdForNodeUser(responder_user_id),
-      details: {
-        stage: "INITIATE",
-        reason: responderPolicy.reason,
-        source: responderPolicy.source,
+    await safeWriteLog(
+      {
+        event_source: "policyService",
+        event_type: "POLICY_BLOCKED",
+        log_level: "WARN",
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        org_id: await getOrgIdForNodeUser(responder_user_id),
+        details: {
+          stage: "INITIATE",
+          reason: responderPolicy.reason,
+          source: responderPolicy.source,
+        },
       },
-    });
+      "initiate_policy_blocked_responder"
+    );
 
-    await behaviorOnPolicyBlocked({
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      handshake_id: null,
-    });
+    await safeBehaviorOnPolicyBlocked(
+      {
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        handshake_id: null,
+      },
+      "initiate_policy_blocked_responder_behavior"
+    );
 
     throw new Error(`Policy blocked responder: ${responderPolicy.reason}`);
   }
 
-  // NONCE (initiator)
   const nonce = nonce_initiator || crypto.randomBytes(16).toString("hex");
 
   const ttl = Number(process.env.REPLAY_TTL_SECONDS || 300);
   const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
 
-  // Pass org_id explicitly (trigger is still a safety net)
   const resolvedOrgId = org_id;
 
   const nonceResult = await reserveNonce({
@@ -168,10 +270,9 @@ export async function initiateHandshake({
     handshake_id: null,
     subject_user_id: initiator_user_id,
     subject_user_key_id: initiator_user_key_id,
-    org_id: resolvedOrgId, // ✅ explicit write for nonce_cache
+    org_id: resolvedOrgId,
   });
 
-  // Replay attempt (initiate)
   if (!nonceResult.ok && nonceResult.code === "NONCE_ALREADY_USED") {
     await logReplayAttack({
       replay_nonce: nonce,
@@ -184,28 +285,43 @@ export async function initiateHandshake({
       subject_user_key_id: initiator_user_key_id,
     });
 
-    await writeLog({
-      event_source: "handshakeService",
-      event_type: "REPLAY_DETECTED",
-      log_level: "WARN",
-      subject_user_id: initiator_user_id,
-      subject_user_key_id: initiator_user_key_id,
-      org_id,
-      details: { nonce, stage: "INITIATE" },
-    });
+    await safeWriteLog(
+      {
+        event_source: "handshakeService",
+        event_type: "REPLAY_DETECTED",
+        log_level: "WARN",
+        subject_user_id: initiator_user_id,
+        subject_user_key_id: initiator_user_key_id,
+        org_id,
+        details: { nonce, stage: "INITIATE" },
+      },
+      "initiate_replay_detected"
+    );
 
-    await behaviorOnReplayDetected({
-      subject_user_id: initiator_user_id,
-      subject_user_key_id: initiator_user_key_id,
-      handshake_id: null,
-    });
+    await safeBehaviorOnReplayDetected(
+      {
+        subject_user_id: initiator_user_id,
+        subject_user_key_id: initiator_user_key_id,
+        handshake_id: null,
+      },
+      "initiate_replay_behavior"
+    );
+
+    try {
+      await enforceReplayAutoBlock({
+        subject_user_id: initiator_user_id,
+        subject_user_key_id: initiator_user_key_id,
+        handshake_id: null,
+      });
+    } catch (blockErr) {
+      console.warn("[initiate_replay_autoblock] skipped:", blockErr?.message || blockErr);
+    }
 
     return { ok: false, code: "REPLAY_NONCE_REUSED" };
   }
 
   if (!nonceResult.ok) throw new Error("Nonce reserve failed.");
 
-  // HANDSHAKE INSERT
   const handshakePayload = {
     initiator_user_id,
     initiator_user_key_id,
@@ -233,7 +349,6 @@ export async function initiateHandshake({
 
   if (error) throw new Error(`Handshake insert failed: ${error.message}`);
 
-  // Link nonce evidence to handshake
   if (nonceResult?.nonce_row?.nonce_id) {
     await linkNonceToHandshake({
       nonce_id: nonceResult.nonce_row.nonce_id,
@@ -241,28 +356,38 @@ export async function initiateHandshake({
     });
   }
 
-  await writeLog({
-    event_source: "handshakeService",
-    event_type: "HANDSHAKE_INITIATED",
-    log_level: "INFO",
-    subject_user_id: initiator_user_id,
-    subject_user_key_id: initiator_user_key_id,
-    handshake_id: handshake.handshake_id,
-    org_id,
-    details: {
-      blockchain_network,
-      responder_user_id,
-      responder_user_key_id,
-      nonce,
-      nonce_expires_at: expiresAt,
+  await safeWriteLog(
+    {
+      event_source: "handshakeService",
+      event_type: "HANDSHAKE_INITIATED",
+      log_level: "INFO",
+      subject_user_id: initiator_user_id,
+      subject_user_key_id: initiator_user_key_id,
+      handshake_id: handshake.handshake_id,
+      org_id,
+      details: {
+        blockchain_network,
+        responder_user_id,
+        responder_user_key_id,
+        nonce,
+        nonce_expires_at: expiresAt,
+      },
     },
-  });
+    "handshake_initiated"
+  );
 
-  await behaviorOnHandshakeInitiated({
-    subject_user_id: initiator_user_id,
-    subject_user_key_id: initiator_user_key_id,
-    handshake_id: handshake.handshake_id,
-  });
+  fireAndForget(
+    () =>
+      safeBehaviorOnHandshakeInitiated(
+        {
+          subject_user_id: initiator_user_id,
+          subject_user_key_id: initiator_user_key_id,
+          handshake_id: handshake.handshake_id,
+        },
+        "handshake_initiated_behavior"
+      ),
+    "handshake_initiated_behavior"
+  );
 
   return { ok: true, handshake };
 }
@@ -289,7 +414,6 @@ export async function respondHandshake({
 
   if (!responder_nonce) throw new Error("responder_nonce is required.");
 
-  // Load handshake
   const { data: hs, error: hsErr } = await supabase
     .from(TABLES.HANDSHAKES)
     .select("*")
@@ -300,14 +424,12 @@ export async function respondHandshake({
 
   const org_id = hs.org_id ?? (await getOrgIdForNodeUser(responder_user_id));
 
-  // State guard
   if (hs.handshake_status !== "INITIATED") {
     throw new Error(
       `Handshake not in INITIATED state. Current: ${hs.handshake_status}`
     );
   }
 
-  // Responder must match handshake record
   if (
     Number(hs.responder_user_id) !== Number(responder_user_id) ||
     Number(hs.responder_user_key_id) !== Number(responder_user_key_id)
@@ -315,27 +437,29 @@ export async function respondHandshake({
     throw new Error("Responder user/key does not match handshake record");
   }
 
-  // POLICY (responder)
   const responderPolicy = await checkNodePolicy({
     user_id: responder_user_id,
     user_key_id: responder_user_key_id,
   });
 
   if (!responderPolicy.allowed) {
-    await writeLog({
-      event_source: "policyService",
-      event_type: "POLICY_BLOCKED",
-      log_level: "WARN",
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      handshake_id,
-      org_id,
-      details: {
-        stage: "RESPOND",
-        reason: responderPolicy.reason,
-        source: responderPolicy.source,
+    await safeWriteLog(
+      {
+        event_source: "policyService",
+        event_type: "POLICY_BLOCKED",
+        log_level: "WARN",
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        handshake_id,
+        org_id,
+        details: {
+          stage: "RESPOND",
+          reason: responderPolicy.reason,
+          source: responderPolicy.source,
+        },
       },
-    });
+      "respond_policy_blocked"
+    );
 
     await supabase
       .from(TABLES.HANDSHAKES)
@@ -346,27 +470,31 @@ export async function respondHandshake({
       })
       .eq("handshake_id", handshake_id);
 
-    await behaviorOnPolicyBlocked({
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      handshake_id,
-    });
+    await safeBehaviorOnPolicyBlocked(
+      {
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        handshake_id,
+      },
+      "respond_policy_blocked_behavior"
+    );
 
-    await behaviorOnHandshakeCompleted({
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      ok: false,
-      handshake_id,
-    });
+    await safeBehaviorOnHandshakeCompleted(
+      {
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        ok: false,
+        handshake_id,
+      },
+      "respond_policy_blocked_completed_behavior"
+    );
 
     throw new Error(`Policy blocked responder: ${responderPolicy.reason}`);
   }
 
-  // Reserve responder nonce (replay protection)
   const ttl = Number(process.env.REPLAY_TTL_SECONDS || 300);
   const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
 
-  // Pass org_id explicitly (trigger is still a safety net)
   const resolvedOrgId = org_id;
 
   const nonceResult = await reserveNonce({
@@ -376,12 +504,10 @@ export async function respondHandshake({
     handshake_id,
     subject_user_id: responder_user_id,
     subject_user_key_id: responder_user_key_id,
-    org_id: resolvedOrgId, // ✅ explicit write for nonce_cache
+    org_id: resolvedOrgId,
   });
 
-  // Replay detected (respond)
   if (!nonceResult.ok && nonceResult.code === "NONCE_ALREADY_USED") {
-    // Evidence row in replay_attacks (with handshake_id)
     try {
       await logReplayAttack({
         replay_nonce: responder_nonce,
@@ -395,16 +521,19 @@ export async function respondHandshake({
       });
     } catch (_) {}
 
-    await writeLog({
-      event_source: "handshakeService",
-      event_type: "REPLAY_DETECTED",
-      log_level: "WARN",
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      handshake_id,
-      org_id,
-      details: { stage: "RESPOND", responder_nonce },
-    });
+    await safeWriteLog(
+      {
+        event_source: "handshakeService",
+        event_type: "REPLAY_DETECTED",
+        log_level: "WARN",
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        handshake_id,
+        org_id,
+        details: { stage: "RESPOND", responder_nonce },
+      },
+      "respond_replay_detected"
+    );
 
     await supabase
       .from(TABLES.HANDSHAKES)
@@ -415,25 +544,40 @@ export async function respondHandshake({
       })
       .eq("handshake_id", handshake_id);
 
-    await behaviorOnReplayDetected({
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      handshake_id,
-    });
+    await safeBehaviorOnReplayDetected(
+      {
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        handshake_id,
+      },
+      "respond_replay_behavior"
+    );
 
-    await behaviorOnHandshakeCompleted({
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      ok: false,
-      handshake_id,
-    });
+    await safeBehaviorOnHandshakeCompleted(
+      {
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        ok: false,
+        handshake_id,
+      },
+      "respond_replay_completed_behavior"
+    );
+
+    try {
+      await enforceReplayAutoBlock({
+        subject_user_id: responder_user_id,
+        subject_user_key_id: responder_user_key_id,
+        handshake_id,
+      });
+    } catch (blockErr) {
+      console.warn("[respond_replay_autoblock] skipped:", blockErr?.message || blockErr);
+    }
 
     throw new Error("Replay detected: responder nonce already used.");
   }
 
   if (!nonceResult.ok) throw new Error("Nonce reserve failed for responder nonce.");
 
-  // Link nonce evidence to handshake
   if (nonceResult?.nonce_row?.nonce_id) {
     await linkNonceToHandshake({
       nonce_id: nonceResult.nonce_row.nonce_id,
@@ -441,7 +585,6 @@ export async function respondHandshake({
     });
   }
 
-  // Update handshake -> COMPLETED
   const { data: updated, error: upErr } = await supabase
     .from(TABLES.HANDSHAKES)
     .update({
@@ -455,34 +598,50 @@ export async function respondHandshake({
 
   if (upErr || !updated) throw new Error("Handshake update failed");
 
-  await writeLog({
-    event_source: "handshakeService",
-    event_type: "HANDSHAKE_COMPLETED",
-    log_level: "INFO",
-    subject_user_id: responder_user_id,
-    subject_user_key_id: responder_user_key_id,
-    handshake_id,
-    org_id,
-    details: {
-      responder_nonce,
-      responder_nonce_expires_at: expiresAt,
+  await safeWriteLog(
+    {
+      event_source: "handshakeService",
+      event_type: "HANDSHAKE_COMPLETED",
+      log_level: "INFO",
+      subject_user_id: responder_user_id,
+      subject_user_key_id: responder_user_key_id,
+      handshake_id,
+      org_id,
+      details: {
+        responder_nonce,
+        responder_nonce_expires_at: expiresAt,
+      },
     },
-  });
+    "handshake_completed"
+  );
 
-  // Behaviour updates (both sides)
-  await behaviorOnHandshakeCompleted({
-    subject_user_id: responder_user_id,
-    subject_user_key_id: responder_user_key_id,
-    ok: true,
-    handshake_id,
-  });
+  fireAndForget(
+    () =>
+      safeBehaviorOnHandshakeCompleted(
+        {
+          subject_user_id: responder_user_id,
+          subject_user_key_id: responder_user_key_id,
+          ok: true,
+          handshake_id,
+        },
+        "respond_completed_responder_behavior"
+      ),
+    "respond_completed_responder_behavior"
+  );
 
-  await behaviorOnHandshakeCompleted({
-    subject_user_id: hs.initiator_user_id,
-    subject_user_key_id: hs.initiator_user_key_id,
-    ok: true,
-    handshake_id,
-  });
+  fireAndForget(
+    () =>
+      safeBehaviorOnHandshakeCompleted(
+        {
+          subject_user_id: hs.initiator_user_id,
+          subject_user_key_id: hs.initiator_user_key_id,
+          ok: true,
+          handshake_id,
+        },
+        "respond_completed_initiator_behavior"
+      ),
+    "respond_completed_initiator_behavior"
+  );
 
   return { ok: true, handshake: updated };
 }

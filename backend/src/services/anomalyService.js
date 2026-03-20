@@ -2,10 +2,12 @@ import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { writeLog } from "./logService.js";
 import { recommendMitigation } from "./mitigationService.js";
+import { enforceAnomalyAutoBlock } from "./autoBlockService.js";
 
 /*
   Phase G — Anomaly Detection Engine (Rule-based)
   Phase H — Mitigation Recommendation Hook (Human-in-the-loop)
+  Phase K — Active Enforcement Hook (Auto-block on high anomaly score)
 */
 
 const DEFAULT_THRESHOLD = Number(process.env.ANOMALY_THRESHOLD ?? 70);
@@ -26,7 +28,7 @@ function clampScore(score) {
 /*
   Resolve org_id for a subject node.
   - Used for anomalies + mitigations so dashboards can filter by company.
-  - Fail-safe: returns null if org can't be derived.
+  - Returns null if org can't be derived.
 */
 async function resolveOrgIdForSubject(subject_user_id) {
   try {
@@ -137,7 +139,8 @@ export function computeRuleScore(profile) {
 /*
   Evaluate anomaly for a node
   - Never throws
-  - Never blocks handshake
+  - Never blocks handshake directly
+  - Can trigger separate active enforcement hook
 */
 export async function evaluateAnomalyForSubject({
   subject_user_id,
@@ -170,7 +173,7 @@ export async function evaluateAnomalyForSubject({
     // 2) Compute score
     const computed = computeRuleScore(profile);
 
-    // Store latest anomaly_score in profile (best-effort)
+    // Store latest anomaly_score in profile
     try {
       await supabase
         .from(TABLES.BEHAVIOR_PROFILES)
@@ -229,13 +232,12 @@ export async function evaluateAnomalyForSubject({
               : null,
           },
           detected_at: toIso(),
-          // keep org_id consistent (safe even if null)
           org_id: org_id ?? null,
         })
         .eq("anomaly_id", existingRow.anomaly_id);
 
       if (!updErr) {
-        // Mitigation recommendation (fail-safe)
+        // 4) Mitigation recommendation 
         try {
           await recommendMitigation({
             anomaly_id: existingRow.anomaly_id,
@@ -245,7 +247,24 @@ export async function evaluateAnomalyForSubject({
           });
         } catch (_) {}
 
-        // Evidence log (dedup/update)
+        // 5) Active enforcement hook
+        try {
+          await enforceAnomalyAutoBlock({
+            subject_user_id,
+            subject_user_key_id,
+            anomaly_id: existingRow.anomaly_id,
+            handshake_id,
+            anomaly_score: computed.anomaly_score,
+            severity: computed.severity,
+          });
+        } catch (blockErr) {
+          console.warn(
+            "[anomaly_existing_autoblock] skipped:",
+            blockErr?.message || blockErr
+          );
+        }
+
+        // 6) Evidence log (dedup/update)
         try {
           await writeLog({
             event_source: "anomalyService",
@@ -295,8 +314,6 @@ export async function evaluateAnomalyForSubject({
           reasons: computed.reasons,
         },
         detected_at: toIso(),
-
-        // enterprise scoping
         org_id: org_id ?? null,
       })
       .select("anomaly_id")
@@ -318,7 +335,24 @@ export async function evaluateAnomalyForSubject({
       });
     } catch (_) {}
 
-    // 6) Event log
+    // 6) Active enforcement hook
+    try {
+      await enforceAnomalyAutoBlock({
+        subject_user_id,
+        subject_user_key_id,
+        anomaly_id,
+        handshake_id,
+        anomaly_score: computed.anomaly_score,
+        severity: computed.severity,
+      });
+    } catch (blockErr) {
+      console.warn(
+        "[anomaly_new_autoblock] skipped:",
+        blockErr?.message || blockErr
+      );
+    }
+
+    // 7) Event log
     try {
       await writeLog({
         event_source: "anomalyService",

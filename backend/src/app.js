@@ -4,13 +4,16 @@ import cors from "cors";
 
 import db from "./routes/db.js";
 import handshake from "./routes/handshake.js";
+import monitoring from "./routes/monitoring.js";
 import anomalyRoutes from "./routes/anomaly.js";
 import behaviourRoutes from "./routes/behaviour.js";
 import eventLogsRoutes from "./routes/eventLogs.js";
 import replayAttacksRoutes from "./routes/replayAttacks.js";
 import devRoutes from "./routes/dev.js";
 import otpRoutes from "./routes/otpRoutes.js";
+import { requestStaffContext } from "./middleware/requestStaffContext.js";
 
+import demoWalletRoutes from "./routes/demoWallet.js";
 import aliasRoutes from "./routes/aliases.js";
 import metricsRoutes from "./routes/metrics.js";
 
@@ -29,6 +32,7 @@ export function createApp() {
 
   app.options("/", cors());
   app.use(express.json());
+  app.use(requestStaffContext);
 
   app.get("/health", (req, res) => {
     res.json({
@@ -40,11 +44,13 @@ export function createApp() {
 
   app.use("/db", db);
   app.use("/handshake", handshake);
+  app.use("/", monitoring);
   app.use("/anomaly", anomalyRoutes);
   app.use("/behaviour", behaviourRoutes);
   app.use("/event-logs", eventLogsRoutes);
   app.use("/replay-attacks", replayAttacksRoutes);
   app.use("/dev", devRoutes);
+  app.use("/demo", demoWalletRoutes);
 
   app.use("/", aliasRoutes);
   app.use("/metrics", metricsRoutes);

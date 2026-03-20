@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secure Handshake Wallet Signing Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    button {
+      padding: 12px 18px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .card {
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #020617;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      overflow-x: auto;
+    }
+
+    .label {
+      font-weight: bold;
+      margin-top: 14px;
+      display: block;
+    }
+
+    .error {
+      color: #f87171;
+      font-weight: bold;
+    }
+
+    .success {
+      color: #4ade80;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Secure Handshake Wallet Signing Demo</h1>
+    <p>
+      This page is used only to demonstrate Ethereum wallet identity proof before
+      secure node handshake validation.
+    </p>
+
+    <button id="connectBtn">Connect MetaMask</button>
+    <button id="signBtn">Sign Identity Proof</button>
+
+    <div class="card">
+      <div><strong>Status:</strong> <span id="status">Not connected</span></div>
+
+      <span class="label">Wallet Address</span>
+      <pre id="addressOutput"></pre>
+
+      <span class="label">Chain ID</span>
+      <pre id="chainOutput"></pre>
+
+      <span class="label">Message</span>
+      <pre id="messageOutput"></pre>
+
+      <span class="label">Signature</span>
+      <pre id="signatureOutput"></pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import { BrowserProvider } from "https://esm.sh/ethers@6.16.0";
+
+    let provider = null;
+    let signer = null;
+    let currentAddress = null;
+
+    const statusEl = document.getElementById("status");
+    const addressOutput = document.getElementById("addressOutput");
+    const chainOutput = document.getElementById("chainOutput");
+    const messageOutput = document.getElementById("messageOutput");
+    const signatureOutput = document.getElementById("signatureOutput");
+
+    document.getElementById("connectBtn").addEventListener("click", connectWallet);
+    document.getElementById("signBtn").addEventListener("click", signProof);
+
+    async function connectWallet() {
+      try {
+        if (!window.ethereum) {
+          throw new Error("MetaMask is not installed");
+        }
+
+        provider = new BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+
+        currentAddress = await signer.getAddress();
+        const network = await provider.getNetwork();
+        const chainId = Number(network.chainId);
+
+        statusEl.textContent = "Connected";
+        statusEl.className = "success";
+        addressOutput.textContent = currentAddress;
+        chainOutput.textContent = String(chainId);
+
+        if (chainId !== 11155111) {
+          statusEl.textContent = "Connected, but not on Sepolia";
+          statusEl.className = "error";
+        }
+      } catch (error) {
+        statusEl.textContent = error.message;
+        statusEl.className = "error";
+      }
+    }
+
+    async function signProof() {
+      try {
+        if (!signer || !currentAddress) {
+          throw new Error("Connect MetaMask first");
+        }
+
+        const payload = {
+          demo_type: "secure_handshake_identity_proof",
+          wallet_address: currentAddress,
+          purpose: "Pre-connection blockchain node identity proof",
+          issued_at: new Date().toISOString()
+        };
+
+        const message = JSON.stringify(payload, null, 2);
+        const signature = await signer.signMessage(message);
+
+        messageOutput.textContent = message;
+        signatureOutput.textContent = signature;
+
+        statusEl.textContent = "Message signed successfully";
+        statusEl.className = "success";
+      } catch (error) {
+        statusEl.textContent = error.message;
+        statusEl.className = "error";
+      }
+    }
+  </script>
+</body>
+</html>

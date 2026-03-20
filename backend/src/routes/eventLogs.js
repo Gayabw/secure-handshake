@@ -1,7 +1,8 @@
-
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
+import { checkRole } from "../middleware/checkRole.js";
+import { ROLE_ACCESS } from "../config/rbac.js";
 
 const router = Router();
 
@@ -12,7 +13,7 @@ function parsePositiveInt(value) {
 }
 
 // GET /event-logs?limit=50&org_id=1&event_type=REPLAY_DETECTED
-router.get("/", async (req, res) => {
+router.get("/", checkRole(ROLE_ACCESS.EVENT_LOGS), async (req, res) => {
   try {
     const limit = parsePositiveInt(req.query.limit) ?? 50;
     const org_id = parsePositiveInt(req.query.org_id);
