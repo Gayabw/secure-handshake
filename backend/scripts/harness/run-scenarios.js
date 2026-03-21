@@ -1,4 +1,3 @@
-
 import { HARNESS } from "./config.js";
 import { sleep, makeNonce } from "../../tools/harness/http.js";
 import {
@@ -15,10 +14,31 @@ function assertNotProd() {
   }
 }
 
-function shortErr(e) {
-  const msg = e?.payload?.error || e?.payload?.message || e?.message || String(e);
-  const code = e?.status ? String(e.status) : "";
-  return code ? `${code} ${msg}` : msg;
+function shortErr(error) {
+  const message =
+    error?.payload?.error ||
+    error?.payload?.message ||
+    error?.message ||
+    String(error);
+
+  const code = error?.status ? String(error.status) : "";
+  return code ? `${code} ${message}` : message;
+}
+
+async function withRetry(fn, { retries = 1, delayMs = 500 } = {}) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt === retries) break;
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
 }
 
 async function doOneHandshake({ kind, seq, tag }) {
@@ -31,49 +51,36 @@ async function doOneHandshake({ kind, seq, tag }) {
     nonce_initiator: makeNonce("init"),
   });
 
-  async function withRetry(fn, { retries = 1, delayMs = 500 } = {}) {
-  let lastErr;
-  for (let i = 0; i <= retries; i++) {
-    try {
-      return await fn();
-    } catch (e) {
-      lastErr = e;
-      if (i === retries) break;
-      await sleep(delayMs);
-    }
-  }
-  throw lastErr;
-}
+  const initRes = await withRetry(
+    () => postInitiate(HARNESS.baseUrl, initBody),
+    { retries: 1, delayMs: 500 }
+  );
 
-  // Optional: allow controlled plugin test paths if your code supports debug hooks.
-  // initBody.debug = { force_plugin_error: true };
-
-  const initRes = await postInitiate(HARNESS.baseUrl, initBody);
   const handshake_id = extractHandshakeId(initRes);
-
   if (!handshake_id) {
     throw new Error("initiate did not return handshake.handshake_id");
   }
 
   console.log(`[harness] ${kind} seq=${seq} initiate <- handshake_id=${handshake_id}`);
 
-  const responder_nonce = makeNonce("resp");
-
   const respBody = buildRespondBody({
     handshake_id,
     responder: HARNESS.responder,
-    responder_nonce,
+    responder_nonce: makeNonce("resp"),
   });
 
-  // Extra field; route ignores unknown keys. Useful if plugins/loggers read body keys.
   respBody.meta = { scenario: tag, kind, seq };
 
   console.log(`[harness] ${kind} seq=${seq} respond -> handshake_id=${handshake_id}`);
-  const respRes = await postRespond(HARNESS.baseUrl, respBody);
+
+  const respRes = await withRetry(
+    () => postRespond(HARNESS.baseUrl, respBody),
+    { retries: 1, delayMs: 500 }
+  );
 
   console.log(`[harness] ${kind} seq=${seq} respond <- ok=${Boolean(respRes?.ok)}`);
 
-  return { handshake_id, responder_nonce };
+  return { handshake_id };
 }
 
 async function runNormal(tag) {
@@ -88,10 +95,7 @@ async function runNormal(tag) {
 }
 
 async function runReplay(tag) {
-  // Reuse a captured responder nonce across new handshakes.
-  // This avoids "COMPLETED state" and hits nonce reuse detection properly.
   const reusedNonce = makeNonce("replay");
-
   console.log(`[harness] replay nonce=${reusedNonce}`);
 
   for (let i = 1; i <= HARNESS.replayAttempts; i++) {
@@ -106,7 +110,10 @@ async function runReplay(tag) {
 
     const initRes = await postInitiate(HARNESS.baseUrl, initBody);
     const handshake_id = extractHandshakeId(initRes);
-    if (!handshake_id) throw new Error("replay initiate missing handshake_id");
+
+    if (!handshake_id) {
+      throw new Error("replay initiate missing handshake_id");
+    }
 
     console.log(`[harness] replay seq=${i} initiate <- handshake_id=${handshake_id}`);
     console.log(`[harness] replay seq=${i} respond -> handshake_id=${handshake_id}`);
@@ -114,7 +121,7 @@ async function runReplay(tag) {
     const respBody = buildRespondBody({
       handshake_id,
       responder: HARNESS.responder,
-      responder_nonce: reusedNonce, // intentional nonce reuse
+      responder_nonce: reusedNonce,
     });
 
     respBody.meta = { scenario: tag, kind: "replay", seq: i };
@@ -122,9 +129,11 @@ async function runReplay(tag) {
     try {
       const out = await postRespond(HARNESS.baseUrl, respBody);
       console.log(`[harness] replay seq=${i} respond <- ok=${Boolean(out?.ok)}`);
-    } catch (e) {
-      console.log(`[replay] blocked seq=${i} ${shortErr(e)}`);
-      if (e?.payload) console.log("[replay] payload:", e.payload);
+    } catch (error) {
+      console.log(`[replay] blocked seq=${i} ${shortErr(error)}`);
+      if (error?.payload) {
+        console.log("[replay] payload:", error.payload);
+      }
     }
 
     await sleep(200);
@@ -132,7 +141,6 @@ async function runReplay(tag) {
 }
 
 async function runBurst(tag) {
-  // Burst: repeated handshakes quickly to trigger burst plugin evidence.
   for (let i = 1; i <= HARNESS.burstCount; i++) {
     await doOneHandshake({ kind: "burst", seq: i, tag });
     await sleep(HARNESS.burstDelayMs);
@@ -150,7 +158,9 @@ async function main() {
   console.log(`[harness] tag=${tag}`);
 
   const normal = await runNormal(tag);
-  if (!normal.length) throw new Error("normal run produced zero handshakes");
+  if (!normal.length) {
+    throw new Error("normal run produced zero handshakes");
+  }
 
   await runReplay(tag);
   await runBurst(tag);
@@ -160,8 +170,10 @@ async function main() {
   console.log(`[harness] use EXPORT_TAG=${tag} for clean dataset export`);
 }
 
-main().catch((e) => {
-  console.error("[harness] failed:", e?.message || e);
-  if (e?.payload) console.error("[harness] payload:", e.payload);
+main().catch((error) => {
+  console.error("[harness] failed:", error?.message || error);
+  if (error?.payload) {
+    console.error("[harness] payload:", error.payload);
+  }
   process.exitCode = 1;
 });

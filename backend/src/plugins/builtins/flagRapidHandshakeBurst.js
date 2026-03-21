@@ -1,18 +1,12 @@
-
 import { PluginDecision } from "../pluginTypes.js";
 import { supabase } from "../../lib/supabase.js";
 import { TABLES } from "../../lib/tables.js";
 
-/*
- Flags if too many handshake requests come from the same IP in a short window.
- Uses event_logs evidence.
- FAIL-SAFE: on DB issues, returns FLAG.
- */
 export const flagRapidHandshakeBurstPlugin = {
   name: "flagRapidHandshakeBurst",
   async run(context = {}) {
     const ip = context?.ip_address || null;
-    const stage = context?.stage;
+    const stage = context?.stage || null;
 
     if (!ip) {
       return {
@@ -22,14 +16,12 @@ export const flagRapidHandshakeBurstPlugin = {
       };
     }
 
-    
     const WINDOW_SECONDS = 60;
-    const FLAG_THRESHOLD = 10;
-
+    const FLAG_THRESHOLD = 5;
     const since = new Date(Date.now() - WINDOW_SECONDS * 1000).toISOString();
-        const table = TABLES?.EVENT_LOGS;
+    const table = TABLES?.EVENT_LOGS;
 
-    if (typeof table !== "string" || table.trim() === "") {
+    if (typeof table !== "string" || !table.trim()) {
       return {
         decision: PluginDecision.FLAG,
         reason: "TABLE_NOT_CONFIGURED",
@@ -43,13 +35,20 @@ export const flagRapidHandshakeBurstPlugin = {
         .select("event_log_id", { count: "exact", head: true })
         .eq("ip_address", ip)
         .eq("event_source", "plugin_framework")
+        .eq("event_type", "PLUGIN_EXECUTED")
+        .eq("details->>plugin_name", "flagRapidHandshakeBurst")
         .gte("event_time", since);
 
       if (error) {
         return {
           decision: PluginDecision.FLAG,
           reason: "EVENT_LOG_LOOKUP_ERROR",
-          details: { message: error.message, ip, since, window_seconds: WINDOW_SECONDS },
+          details: {
+            message: error.message,
+            ip,
+            since,
+            window_seconds: WINDOW_SECONDS,
+          },
         };
       }
 
@@ -70,7 +69,12 @@ export const flagRapidHandshakeBurstPlugin = {
       return {
         decision: PluginDecision.ALLOW,
         reason: "RATE_OK",
-        details: { ip, recent_count: count ?? 0, since, window_seconds: WINDOW_SECONDS },
+        details: {
+          ip,
+          recent_count: count ?? 0,
+          since,
+          window_seconds: WINDOW_SECONDS,
+        },
       };
     } catch (e) {
       return {
@@ -79,6 +83,5 @@ export const flagRapidHandshakeBurstPlugin = {
         details: { message: e?.message || String(e), ip },
       };
     }
-    
   },
 };

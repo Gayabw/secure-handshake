@@ -168,6 +168,7 @@ export async function initiateHandshake({
   responder_user_key_id,
   blockchain_network,
   nonce_initiator = null,
+  ip_address = null,
 }) {
   const now = new Date().toISOString();
 
@@ -357,24 +358,25 @@ export async function initiateHandshake({
   }
 
   await safeWriteLog(
-    {
-      event_source: "handshakeService",
-      event_type: "HANDSHAKE_INITIATED",
-      log_level: "INFO",
-      subject_user_id: initiator_user_id,
-      subject_user_key_id: initiator_user_key_id,
-      handshake_id: handshake.handshake_id,
-      org_id,
-      details: {
-        blockchain_network,
-        responder_user_id,
-        responder_user_key_id,
-        nonce,
-        nonce_expires_at: expiresAt,
-      },
+  {
+    event_source: "handshakeService",
+    event_type: "HANDSHAKE_INITIATED",
+    log_level: "INFO",
+    subject_user_id: initiator_user_id,
+    subject_user_key_id: initiator_user_key_id,
+    handshake_id: handshake.handshake_id,
+    org_id,
+    ip_address,
+    details: {
+      blockchain_network,
+      responder_user_id,
+      responder_user_key_id,
+      nonce,
+      nonce_expires_at: expiresAt,
     },
-    "handshake_initiated"
-  );
+  },
+  "handshake_initiated"
+);
 
   fireAndForget(
     () =>
@@ -399,6 +401,7 @@ export async function respondHandshake({
   responder_user_id,
   responder_user_key_id,
   responder_nonce,
+  ip_address = null,
 }) {
   const now = new Date().toISOString();
 
@@ -599,21 +602,22 @@ export async function respondHandshake({
   if (upErr || !updated) throw new Error("Handshake update failed");
 
   await safeWriteLog(
-    {
-      event_source: "handshakeService",
-      event_type: "HANDSHAKE_COMPLETED",
-      log_level: "INFO",
-      subject_user_id: responder_user_id,
-      subject_user_key_id: responder_user_key_id,
-      handshake_id,
-      org_id,
-      details: {
-        responder_nonce,
-        responder_nonce_expires_at: expiresAt,
-      },
+  {
+    event_source: "handshakeService",
+    event_type: "HANDSHAKE_COMPLETED",
+    log_level: "INFO",
+    subject_user_id: responder_user_id,
+    subject_user_key_id: responder_user_key_id,
+    handshake_id,
+    org_id,
+    ip_address,
+    details: {
+      responder_nonce,
+      responder_nonce_expires_at: expiresAt,
     },
-    "handshake_completed"
-  );
+  },
+  "handshake_completed"
+);
 
   fireAndForget(
     () =>

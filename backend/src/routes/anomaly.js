@@ -2,6 +2,8 @@ import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { TABLES } from "../lib/tables.js";
 import { writeLog } from "../services/logService.js";
+import { checkRole } from "../middleware/checkRole.js";
+import { ROLE_ACCESS } from "../config/rbac.js";
 
 const router = Router();
 
@@ -25,7 +27,7 @@ function parsePositiveInt(value) {
   return n;
 }
 
-router.post("/resolve", async (req, res) => {
+router.post("/resolve", checkRole(ROLE_ACCESS.ANOMALIES), async (req, res) => {
   try {
     const anomaly_id = parsePositiveInt(req.body.anomaly_id);
     const resolved_by_staff_id = parsePositiveInt(req.body.resolved_by_staff_id);

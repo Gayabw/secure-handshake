@@ -1,10 +1,12 @@
 from pathlib import Path
 import json
 import numpy as np
-
-import joblib
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import joblib
+
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -90,34 +92,62 @@ def build_features(df):
 
     for col in categorical_candidates:
         if col in work.columns:
-            work[col] = work[col].where(pd.notna(work[col]), None)
-            work[col] = work[col].astype(object)
+            work[col] = work[col].where(pd.notna(work[col]), None).astype(object)
 
     for col in numeric_candidates:
         if col in work.columns:
             work[col] = pd.to_numeric(work[col], errors="coerce")
 
     drop_cols = ["label", "target", "time"]
-
     feature_cols = [c for c in work.columns if c not in drop_cols]
+
     X = work[feature_cols].copy()
     y = work["target"].copy()
 
     all_null_cols = [c for c in X.columns if X[c].isna().all()]
     if all_null_cols:
-        X = X.drop(columns=all_null_cols)
+      X = X.drop(columns=all_null_cols)
 
     categorical_cols = [c for c in categorical_candidates if c in X.columns]
     numeric_cols = [c for c in numeric_candidates if c in X.columns]
 
-    for col in categorical_cols:
-        X[col] = X[col].where(pd.notna(X[col]), None)
-        X[col] = X[col].astype(object)
-
-    for col in numeric_cols:
-        X[col] = pd.to_numeric(X[col], errors="coerce")
-
     return X, y, categorical_cols, numeric_cols, work
+
+
+def build_preprocessor(categorical_cols, numeric_cols):
+    transformers = []
+
+    if categorical_cols:
+        transformers.append(
+            (
+                "cat",
+                Pipeline(
+                    steps=[
+                        ("imputer", SimpleImputer(strategy="most_frequent")),
+                        ("onehot", OneHotEncoder(handle_unknown="ignore")),
+                    ]
+                ),
+                categorical_cols,
+            )
+        )
+
+    if numeric_cols:
+        transformers.append(
+            (
+                "num",
+                Pipeline(
+                    steps=[
+                        ("imputer", SimpleImputer(strategy="median")),
+                    ]
+                ),
+                numeric_cols,
+            )
+        )
+
+    if not transformers:
+        raise ValueError("No usable feature columns found")
+
+    return ColumnTransformer(transformers=transformers)
 
 
 def main():
@@ -134,29 +164,10 @@ def main():
     print(f"[ml] usable rows={len(prepared_df)}")
     print(f"[ml] label counts:\n{prepared_df['label'].value_counts(dropna=False)}")
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            (
-                "cat",
-                Pipeline(
-                    steps=[
-                        ("imputer", SimpleImputer(strategy="most_frequent")),
-                        ("onehot", OneHotEncoder(handle_unknown="ignore")),
-                    ]
-                ),
-                categorical_cols,
-            ),
-            (
-                "num",
-                Pipeline(
-                    steps=[
-                        ("imputer", SimpleImputer(strategy="median")),
-                    ]
-                ),
-                numeric_cols,
-            ),
-        ]
-    )
+    if y.nunique() < 2:
+        raise ValueError("Training requires at least two classes in the target column")
+
+    preprocessor = build_preprocessor(categorical_cols, numeric_cols)
 
     model = RandomForestClassifier(
         n_estimators=200,
@@ -249,22 +260,22 @@ def main():
     plt.close()
 
     try:
-      preprocessor_fitted = pipeline.named_steps["preprocessor"]
-      model_fitted = pipeline.named_steps["model"]
+        preprocessor_fitted = pipeline.named_steps["preprocessor"]
+        model_fitted = pipeline.named_steps["model"]
 
-      feature_names = preprocessor_fitted.get_feature_names_out()
-      importances = model_fitted.feature_importances_
+        feature_names = preprocessor_fitted.get_feature_names_out()
+        importances = model_fitted.feature_importances_
 
-      fi_df = pd.DataFrame(
-          {
-              "feature": feature_names,
-              "importance": importances,
-          }
-      ).sort_values("importance", ascending=False)
+        fi_df = pd.DataFrame(
+            {
+                "feature": feature_names,
+                "importance": importances,
+            }
+        ).sort_values("importance", ascending=False)
 
-      fi_df.to_csv(features_path, index=False)
+        fi_df.to_csv(features_path, index=False)
     except Exception as exc:
-      print(f"[ml] feature importance export skipped: {exc}")
+        print(f"[ml] feature importance export skipped: {exc}")
 
     print("[ml] training complete")
     print(f"[ml] model: {model_path}")

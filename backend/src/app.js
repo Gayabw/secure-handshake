@@ -11,12 +11,11 @@ import eventLogsRoutes from "./routes/eventLogs.js";
 import replayAttacksRoutes from "./routes/replayAttacks.js";
 import devRoutes from "./routes/dev.js";
 import otpRoutes from "./routes/otpRoutes.js";
-import { requestStaffContext } from "./middleware/requestStaffContext.js";
-
 import demoWalletRoutes from "./routes/demoWallet.js";
 import aliasRoutes from "./routes/aliases.js";
 import metricsRoutes from "./routes/metrics.js";
 
+import { requestStaffContext } from "./middleware/requestStaffContext.js";
 import { supabase } from "./lib/supabase.js";
 
 export function createApp() {
@@ -24,18 +23,19 @@ export function createApp() {
 
   app.use(
     cors({
-      origin: "http://localhost:3000",
+      origin: process.env.FRONTEND_URL || "http://localhost:3000",
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
     })
   );
 
-  app.options("/", cors());
   app.use(express.json());
   app.use(requestStaffContext);
 
-  app.get("/health", (req, res) => {
-    res.json({
+  app.set("supabase", supabase);
+
+  app.get("/health", (_req, res) => {
+    return res.status(200).json({
       ok: true,
       service: "Secure Handshake Backend",
       time: new Date().toISOString(),
@@ -51,24 +51,24 @@ export function createApp() {
   app.use("/replay-attacks", replayAttacksRoutes);
   app.use("/dev", devRoutes);
   app.use("/demo", demoWalletRoutes);
-
   app.use("/", aliasRoutes);
   app.use("/metrics", metricsRoutes);
-
   app.use("/otp", otpRoutes);
 
-  // Make Supabase available via req.app.get("supabase")
-  app.set("supabase", supabase);
-
-  // Simple 404 for unknown routes
-  app.use((req, res) => {
-    res.status(404).json({ ok: false, error: "Route not found" });
+  app.use((_req, res) => {
+    return res.status(404).json({
+      ok: false,
+      error: "Route not found",
+    });
   });
 
-  // Global error handler
-  app.use((err, req, res, next) => {
-    console.error(err);
-    res.status(500).json({ ok: false, error: "Internal server error" });
+  app.use((err, _req, res, _next) => {
+    console.error("Unhandled application error:", err);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Internal server error",
+    });
   });
 
   return app;

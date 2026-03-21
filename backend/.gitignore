@@ -8,3 +8,4 @@ node_modules/
 backend/exports/
 backend/ml/reports/backup_*/
 backend/scripts/export/*.backup.js
+exports/

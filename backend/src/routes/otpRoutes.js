@@ -6,6 +6,23 @@ import { insertAuthAudit, logEvent, logSecurityEvent } from "../services/auditLo
 
 const router = express.Router();
 
+function getDashboardRoute(role) {
+  switch (role) {
+    case "ADMIN":
+      return "/dashboard/network-admin";
+    case "SOC":
+      return "/dashboard/soc-analyst";
+    case "ENGINEER":
+      return "/dashboard/security-engineer";
+    case "IR":
+      return "/dashboard/incident-responder";
+    case "AUDITOR":
+      return "/dashboard/auditor";
+    default:
+      return "/";
+  }
+}
+
 function clientMeta(req) {
   const ip =
     req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() ||
@@ -119,6 +136,34 @@ router.post("/verify", async (req, res) => {
 
     const sess = result.session || null;
 
+    //  Fetch staff user from DB
+    let staff = null;
+    if (result.ok) {
+      const { data, error } = await req.app
+        .get("supabase")
+        .from("staff_user")
+        .select("*")
+        .eq("staff_id", staff_id)
+        .single();
+
+      if (error || !data) {
+        return res.status(404).json({
+          ok: false,
+          error: "Staff user not found",
+        });
+      }
+
+      if (data.status !== "active") {
+        return res.status(403).json({
+          ok: false,
+          error: "User inactive",
+        });
+      }
+
+      staff = data;
+    }
+
+    // AUDIT LOGS
     const auth_id = await insertAuthAudit({
       auth_type: "OTP_APPROVAL",
       user_id: sess?.user_id ?? null,
@@ -168,14 +213,32 @@ router.post("/verify", async (req, res) => {
       log_level: result.ok ? "INFO" : "WARN",
     });
 
-    return res.status(result.ok ? 200 : 401).json({
-      ok: Boolean(result.ok),
+    // FINAL RESPONSE 
+    if (result.ok) {
+      return res.status(200).json({
+        ok: true,
+        verified_at: result.verified_at,
+
+        staff: {
+          staff_id: staff.staff_id,
+          email: staff.staff_email,
+          role: staff.staff_role,
+        },
+
+        redirect: getDashboardRoute(staff.staff_role),
+      });
+    }
+
+    return res.status(401).json({
+      ok: false,
       reason: result.reason,
-      verified_at: result.verified_at || null,
     });
+
   } catch (err) {
-    return res.status(400).json({ ok: false, error: err.message });
+    return res.status(400).json({
+      ok: false,
+      error: err.message,
+    });
   }
 });
-
 export default router;

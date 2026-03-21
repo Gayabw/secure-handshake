@@ -1,5 +1,7 @@
 export function checkRole(allowedRoles = []) {
-  const allowed = new Set(allowedRoles);
+  const allowed = new Set(
+    Array.isArray(allowedRoles) ? allowedRoles.filter(Boolean) : []
+  );
 
   return function roleGuard(req, res, next) {
     const role = req.staff?.role || null;
@@ -7,7 +9,7 @@ export function checkRole(allowedRoles = []) {
     if (!role) {
       return res.status(401).json({
         ok: false,
-        error: "Missing or invalid x-staff-role header",
+        error: "Authentication required or staff role is invalid",
       });
     }
 
