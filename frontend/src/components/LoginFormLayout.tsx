@@ -1,5 +1,9 @@
 import { useState, type FormEvent } from "react";
+<<<<<<< HEAD
+import { Link, useNavigate } from "react-router-dom";
+=======
 import { Link } from "react-router-dom";
+>>>>>>> origin/main
 import { FaSun, FaMoon } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import footerPattern from "../assets/footer-bg.png";
@@ -9,7 +13,10 @@ type LoginFormLayoutProps = {
   toggleTheme: () => void;
   roleTitle: string;
   roleDescription: string;
+<<<<<<< HEAD
+=======
   onSubmit: (email: string) => void;
+>>>>>>> origin/main
 };
 
 function LoginFormLayout({
@@ -17,14 +24,32 @@ function LoginFormLayout({
   toggleTheme,
   roleTitle,
   roleDescription,
+<<<<<<< HEAD
+}: LoginFormLayoutProps) {
+  const navigate = useNavigate();
+
+=======
   onSubmit,
 }: LoginFormLayoutProps) {
+>>>>>>> origin/main
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+<<<<<<< HEAD
+
+    if (!email.trim() || !password.trim()) return;
+
+    navigate("/otp-verification", {
+      state: {
+        email,
+        role: roleTitle,
+      },
+    });
+=======
     onSubmit(email);
+>>>>>>> origin/main
   };
 
   return (
@@ -71,7 +96,11 @@ function LoginFormLayout({
                 id="email"
                 name="email"
                 type="email"
+<<<<<<< HEAD
+                placeholder="Enter your registered email"
+=======
                 placeholder="Enter your email"
+>>>>>>> origin/main
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

@@ -84,11 +84,24 @@
   background: linear-gradient(to right, transparent, #c8a44f, transparent);
 }
 
+<<<<<<< HEAD
+a.dashboard-logo-container,
+a.dashboard-logo-container:visited,
+a.dashboard-logo-container:hover,
+a.dashboard-logo-container:active {
+=======
 .dashboard-logo-container {
+>>>>>>> origin/main
   display: flex;
   align-items: center;
   gap: 15px;
   min-width: 0;
+<<<<<<< HEAD
+  text-decoration: none !important;
+  color: #ffffff !important;
+  cursor: pointer;
+=======
+>>>>>>> origin/main
 }
 
 .dashboard-logo {
@@ -103,11 +116,37 @@
   margin: 0;
   font-family: "Inter", Tahoma, Geneva, Verdana, sans-serif;
   white-space: nowrap;
+<<<<<<< HEAD
+  color: #ffffff !important;
+  text-decoration: none !important;
+=======
+>>>>>>> origin/main
 }
 
 .dashboard-navbar-actions {
   display: flex;
   align-items: center;
+<<<<<<< HEAD
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.dashboard-logout-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: Tahoma, sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.admin-dashboard-page.light .dashboard-logout-link {
+=======
   gap: 14px;
   flex-shrink: 0;
 }
@@ -126,21 +165,37 @@
 }
 
 .admin-dashboard-page.light .dashboard-back-link {
+>>>>>>> origin/main
   background-color: #334155;
   color: #f8fafc;
 }
 
+<<<<<<< HEAD
+.admin-dashboard-page.light .dashboard-logout-link:hover {
+  background-color: #1e293b;
+  transform: translateY(-1px);
+}
+
+.admin-dashboard-page.dark .dashboard-logout-link {
+=======
 .admin-dashboard-page.light .dashboard-back-link:hover {
   background-color: #1e293b;
 }
 
 .admin-dashboard-page.dark .dashboard-back-link {
+>>>>>>> origin/main
   background-color: #f5b800;
   color: #0f172a;
 }
 
+<<<<<<< HEAD
+.admin-dashboard-page.dark .dashboard-logout-link:hover {
+  background-color: #d9a600;
+  transform: translateY(-1px);
+=======
 .admin-dashboard-page.dark .dashboard-back-link:hover {
   background-color: #d9a600;
+>>>>>>> origin/main
 }
 
 /* THEME TOGGLE */
@@ -300,8 +355,11 @@
   font-size: 16px;
 }
 
+<<<<<<< HEAD
+=======
 /* OLD SIDEBAR BACK BUTTON */
 
+>>>>>>> origin/main
 .back-to-roles-btn {
   display: none;
 }
@@ -316,10 +374,17 @@
 
 .dashboard-watermark {
   position: absolute;
+<<<<<<< HEAD
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 120px;
+=======
   top: 60px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 160px;
+>>>>>>> origin/main
   font-weight: 800;
   white-space: nowrap;
   pointer-events: none;
@@ -328,11 +393,19 @@
 }
 
 .admin-dashboard-page.light .dashboard-watermark {
+<<<<<<< HEAD
+  color: rgba(200, 164, 79, 0.08);
+}
+
+.admin-dashboard-page.dark .dashboard-watermark {
+  color: rgba(245, 184, 0, 0.06);
+=======
   color: rgba(200, 164, 79, 0.1);
 }
 
 .admin-dashboard-page.dark .dashboard-watermark {
   color: rgba(245, 184, 0, 0.08);
+>>>>>>> origin/main
 }
 
 .dashboard-hero,
@@ -427,19 +500,111 @@
   font-weight: 700;
 }
 
+<<<<<<< HEAD
+.info-card h3 {
+=======
 .info-card h3,
 .feature-card h3 {
+>>>>>>> origin/main
   font-size: 1.2rem;
   margin-bottom: 14px;
   font-family: Tahoma, sans-serif;
 }
 
+<<<<<<< HEAD
+/* ALERTS */
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.alert-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  transition: all 0.25s ease;
+  border-left: 5px solid;
+}
+
+.alert-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alert-message {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0;
+}
+
+.alert-time {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.alert-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.alert-item.critical {
+  background-color: rgba(255, 0, 0, 0.08);
+  border-left-color: #dc2626;
+}
+
+.alert-item.critical .alert-message {
+  color: #dc2626;
+}
+
+.alert-item.critical .alert-badge {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.alert-item.high {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-left-color: #f59e0b;
+}
+
+.alert-item.high .alert-message {
+  color: #f59e0b;
+}
+
+.alert-item.high .alert-badge {
+  background-color: #f59e0b;
+  color: #ffffff;
+}
+
+.alert-item.medium {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left-color: #3b82f6;
+}
+
+.alert-item.medium .alert-message {
+  color: #3b82f6;
+}
+
+.alert-item.medium .alert-badge {
+  background-color: #3b82f6;
+  color: #ffffff;
+=======
 .info-card ul {
   padding-left: 18px;
   line-height: 1.7;
   display: flex;
   flex-direction: column;
   gap: 10px;
+>>>>>>> origin/main
 }
 
 /* FOOTER */
@@ -449,8 +614,14 @@
   text-align: center;
   padding: 50px 40px;
   font-size: 14px;
+<<<<<<< HEAD
+  margin-top: auto;
+  overflow: hidden;
+  width: 100%;
+=======
   margin-top: 0;
   overflow: hidden;
+>>>>>>> origin/main
 }
 
 .dashboard-footer * {
@@ -492,6 +663,8 @@
   text-align: center;
 }
 
+<<<<<<< HEAD
+=======
 .dashboard-footer-links {
   display: flex;
   gap: 22px;
@@ -499,6 +672,7 @@
   font-family: Tahoma, sans-serif;
 }
 
+>>>>>>> origin/main
 /* RESPONSIVE */
 
 @media (max-width: 1200px) {
@@ -528,7 +702,11 @@
     gap: 10px;
   }
 
+<<<<<<< HEAD
+  .dashboard-logout-link {
+=======
   .dashboard-back-link {
+>>>>>>> origin/main
     font-size: 13px;
     padding: 9px 12px;
   }
@@ -569,11 +747,14 @@
   .network-admin-content {
     padding: 24px 18px;
   }
+<<<<<<< HEAD
+=======
 
   .dashboard-footer-overlay {
     flex-direction: column;
     align-items: center;
   }
+>>>>>>> origin/main
 }
 
 @media (max-width: 640px) {
@@ -597,7 +778,11 @@
     gap: 8px;
   }
 
+<<<<<<< HEAD
+  .dashboard-logout-link {
+=======
   .dashboard-back-link {
+>>>>>>> origin/main
     font-size: 12px;
     padding: 8px 10px;
   }
@@ -635,8 +820,19 @@
     padding: 22px 18px;
   }
 
+<<<<<<< HEAD
+  .dashboard-watermark {
+    font-size: 80px;
+  }
+
+  .dashboard-footer {
+    padding: 40px 20px;
+  }
+}
+=======
   .dashboard-footer {
     padding: 40px 20px;
   }
 }
 
+>>>>>>> origin/main

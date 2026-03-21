@@ -24,12 +24,36 @@ function OTPVerification({ theme, toggleTheme }: OTPVerificationProps) {
   const email = state.email || "";
   const role = state.role || "User";
 
+<<<<<<< HEAD
+  const normalizedRole = role.trim().toLowerCase();
+
+=======
+>>>>>>> origin/main
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (otp.length !== 6) return;
 
     const dashboardRoutes: Record<string, string> = {
+<<<<<<< HEAD
+      "network admin": "/dashboard/network-admin",
+      "soc analyst": "/dashboard/soc-analyst",
+      "soc analyst 01": "/dashboard/soc-analyst",
+      "soc analyst 02": "/dashboard/soc-analyst",
+      "security engineer": "/dashboard/security-engineer",
+      "incident responder": "/dashboard/incident-responder",
+      auditor: "/dashboard/auditor",
+    };
+
+    const targetRoute = dashboardRoutes[normalizedRole];
+
+    if (targetRoute) {
+      navigate(targetRoute);
+      return;
+    }
+
+    navigate("/");
+=======
       "Network Admin": "/dashboard/network-admin",
       "SOC Analyst": "/dashboard/soc-analyst",
       "Security Engineer": "/dashboard/security-engineer",
@@ -44,6 +68,7 @@ function OTPVerification({ theme, toggleTheme }: OTPVerificationProps) {
     } else {
       navigate("/");
     }
+>>>>>>> origin/main
   };
 
   return (

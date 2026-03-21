@@ -11,7 +11,11 @@ function AuditorLogin({ theme, toggleTheme }: AuditorLoginProps) {
       theme={theme}
       toggleTheme={toggleTheme}
       roleTitle="Auditor"
+<<<<<<< HEAD
+      roleDescription="Review audit trails, compliance records, and verification activity across the protected platform."
+=======
       roleDescription="Review logs, verify compliance evidence, and inspect authentication and activity records."
+>>>>>>> origin/main
     />
   );
 }
