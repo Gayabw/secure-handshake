@@ -84,24 +84,17 @@
   background: linear-gradient(to right, transparent, #c8a44f, transparent);
 }
 
-<<<<<<< HEAD
 a.dashboard-logo-container,
 a.dashboard-logo-container:visited,
 a.dashboard-logo-container:hover,
 a.dashboard-logo-container:active {
-=======
-.dashboard-logo-container {
->>>>>>> origin/main
   display: flex;
   align-items: center;
   gap: 15px;
   min-width: 0;
-<<<<<<< HEAD
   text-decoration: none !important;
   color: #ffffff !important;
   cursor: pointer;
-=======
->>>>>>> origin/main
 }
 
 .dashboard-logo {
@@ -116,17 +109,13 @@ a.dashboard-logo-container:active {
   margin: 0;
   font-family: "Inter", Tahoma, Geneva, Verdana, sans-serif;
   white-space: nowrap;
-<<<<<<< HEAD
   color: #ffffff !important;
   text-decoration: none !important;
-=======
->>>>>>> origin/main
 }
 
 .dashboard-navbar-actions {
   display: flex;
   align-items: center;
-<<<<<<< HEAD
   gap: 12px;
   flex-shrink: 0;
 }
@@ -146,56 +135,23 @@ a.dashboard-logo-container:active {
 }
 
 .admin-dashboard-page.light .dashboard-logout-link {
-=======
-  gap: 14px;
-  flex-shrink: 0;
-}
-
-.dashboard-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 700;
-  font-family: Tahoma, sans-serif;
-  padding: 10px 14px;
-  border-radius: 10px;
-  transition: all 0.3s ease;
-}
-
-.admin-dashboard-page.light .dashboard-back-link {
->>>>>>> origin/main
   background-color: #334155;
   color: #f8fafc;
 }
 
-<<<<<<< HEAD
 .admin-dashboard-page.light .dashboard-logout-link:hover {
   background-color: #1e293b;
   transform: translateY(-1px);
 }
 
 .admin-dashboard-page.dark .dashboard-logout-link {
-=======
-.admin-dashboard-page.light .dashboard-back-link:hover {
-  background-color: #1e293b;
-}
-
-.admin-dashboard-page.dark .dashboard-back-link {
->>>>>>> origin/main
   background-color: #f5b800;
   color: #0f172a;
 }
 
-<<<<<<< HEAD
 .admin-dashboard-page.dark .dashboard-logout-link:hover {
   background-color: #d9a600;
   transform: translateY(-1px);
-=======
-.admin-dashboard-page.dark .dashboard-back-link:hover {
-  background-color: #d9a600;
->>>>>>> origin/main
 }
 
 /* THEME TOGGLE */
@@ -355,11 +311,6 @@ a.dashboard-logo-container:active {
   font-size: 16px;
 }
 
-<<<<<<< HEAD
-=======
-/* OLD SIDEBAR BACK BUTTON */
-
->>>>>>> origin/main
 .back-to-roles-btn {
   display: none;
 }
@@ -374,17 +325,10 @@ a.dashboard-logo-container:active {
 
 .dashboard-watermark {
   position: absolute;
-<<<<<<< HEAD
   top: 70px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 120px;
-=======
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 160px;
->>>>>>> origin/main
   font-weight: 800;
   white-space: nowrap;
   pointer-events: none;
@@ -393,19 +337,11 @@ a.dashboard-logo-container:active {
 }
 
 .admin-dashboard-page.light .dashboard-watermark {
-<<<<<<< HEAD
   color: rgba(200, 164, 79, 0.08);
 }
 
 .admin-dashboard-page.dark .dashboard-watermark {
   color: rgba(245, 184, 0, 0.06);
-=======
-  color: rgba(200, 164, 79, 0.1);
-}
-
-.admin-dashboard-page.dark .dashboard-watermark {
-  color: rgba(245, 184, 0, 0.08);
->>>>>>> origin/main
 }
 
 .dashboard-hero,
@@ -500,18 +436,12 @@ a.dashboard-logo-container:active {
   font-weight: 700;
 }
 
-<<<<<<< HEAD
 .info-card h3 {
-=======
-.info-card h3,
-.feature-card h3 {
->>>>>>> origin/main
   font-size: 1.2rem;
   margin-bottom: 14px;
   font-family: Tahoma, sans-serif;
 }
 
-<<<<<<< HEAD
 /* ALERTS */
 
 .alerts-list {
@@ -597,14 +527,6 @@ a.dashboard-logo-container:active {
 .alert-item.medium .alert-badge {
   background-color: #3b82f6;
   color: #ffffff;
-=======
-.info-card ul {
-  padding-left: 18px;
-  line-height: 1.7;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
->>>>>>> origin/main
 }
 
 /* FOOTER */
@@ -614,14 +536,9 @@ a.dashboard-logo-container:active {
   text-align: center;
   padding: 50px 40px;
   font-size: 14px;
-<<<<<<< HEAD
   margin-top: auto;
   overflow: hidden;
   width: 100%;
-=======
-  margin-top: 0;
-  overflow: hidden;
->>>>>>> origin/main
 }
 
 .dashboard-footer * {
@@ -663,16 +580,6 @@ a.dashboard-logo-container:active {
   text-align: center;
 }
 
-<<<<<<< HEAD
-=======
-.dashboard-footer-links {
-  display: flex;
-  gap: 22px;
-  font-weight: 600;
-  font-family: Tahoma, sans-serif;
-}
-
->>>>>>> origin/main
 /* RESPONSIVE */
 
 @media (max-width: 1200px) {
@@ -702,11 +609,7 @@ a.dashboard-logo-container:active {
     gap: 10px;
   }
 
-<<<<<<< HEAD
   .dashboard-logout-link {
-=======
-  .dashboard-back-link {
->>>>>>> origin/main
     font-size: 13px;
     padding: 9px 12px;
   }
@@ -747,14 +650,6 @@ a.dashboard-logo-container:active {
   .network-admin-content {
     padding: 24px 18px;
   }
-<<<<<<< HEAD
-=======
-
-  .dashboard-footer-overlay {
-    flex-direction: column;
-    align-items: center;
-  }
->>>>>>> origin/main
 }
 
 @media (max-width: 640px) {
@@ -778,11 +673,7 @@ a.dashboard-logo-container:active {
     gap: 8px;
   }
 
-<<<<<<< HEAD
   .dashboard-logout-link {
-=======
-  .dashboard-back-link {
->>>>>>> origin/main
     font-size: 12px;
     padding: 8px 10px;
   }
@@ -820,7 +711,6 @@ a.dashboard-logo-container:active {
     padding: 22px 18px;
   }
 
-<<<<<<< HEAD
   .dashboard-watermark {
     font-size: 80px;
   }
@@ -829,10 +719,3 @@ a.dashboard-logo-container:active {
     padding: 40px 20px;
   }
 }
-=======
-  .dashboard-footer {
-    padding: 40px 20px;
-  }
-}
-
->>>>>>> origin/main

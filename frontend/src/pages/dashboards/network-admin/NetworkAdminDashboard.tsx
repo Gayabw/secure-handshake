@@ -8,19 +8,11 @@ import {
   FaPlug,
   FaFileAlt,
   FaListAlt,
-<<<<<<< HEAD
   FaSignOutAlt,
 } from "react-icons/fa";
 import { MdDashboard, MdOutlineVerifiedUser } from "react-icons/md";
 import logo from "../../../assets/logo.png";
 import { useNavigate, Link } from "react-router-dom";
-=======
-  FaArrowLeft,
-} from "react-icons/fa";
-import { MdDashboard, MdOutlineVerifiedUser } from "react-icons/md";
-import { Link } from "react-router-dom";
-import logo from "../../../assets/logo.png";
->>>>>>> origin/main
 
 type NetworkAdminDashboardProps = {
   theme: "light" | "dark";
@@ -79,7 +71,6 @@ function NetworkAdminDashboard({
   theme,
   toggleTheme,
 }: NetworkAdminDashboardProps) {
-<<<<<<< HEAD
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -103,21 +94,6 @@ function NetworkAdminDashboard({
             <FaSignOutAlt />
             <span>Logout</span>
           </button>
-=======
-  return (
-    <div className={`admin-dashboard-page ${theme}`}>
-      <nav className="dashboard-navbar">
-        <div className="dashboard-logo-container">
-          <img src={logo} alt="BlockShield Logo" className="dashboard-logo" />
-          <h2>BlockShield</h2>
-        </div>
-
-        <div className="dashboard-navbar-actions">
-          <Link to="/roles" className="dashboard-back-link">
-            <FaArrowLeft />
-            <span>Back to Roles</span>
-          </Link>
->>>>>>> origin/main
 
           <button
             type="button"

@@ -13,13 +13,8 @@ function SocAnalyst02Login({
     <LoginFormLayout
       theme={theme}
       toggleTheme={toggleTheme}
-<<<<<<< HEAD
       roleTitle="SOC Analyst"
       roleDescription="Investigate alerts, validate suspicious patterns, and support continuous security monitoring operations."
-=======
-      roleTitle="SOC Analyst 02"
-      roleDescription="Investigate advanced threats, validate suspicious behavior, and escalate critical findings."
->>>>>>> origin/main
     />
   );
 }

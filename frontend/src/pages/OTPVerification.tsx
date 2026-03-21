@@ -24,18 +24,14 @@ function OTPVerification({ theme, toggleTheme }: OTPVerificationProps) {
   const email = state.email || "";
   const role = state.role || "User";
 
-<<<<<<< HEAD
   const normalizedRole = role.trim().toLowerCase();
 
-=======
->>>>>>> origin/main
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (otp.length !== 6) return;
 
     const dashboardRoutes: Record<string, string> = {
-<<<<<<< HEAD
       "network admin": "/dashboard/network-admin",
       "soc analyst": "/dashboard/soc-analyst",
       "soc analyst 01": "/dashboard/soc-analyst",
@@ -53,22 +49,6 @@ function OTPVerification({ theme, toggleTheme }: OTPVerificationProps) {
     }
 
     navigate("/");
-=======
-      "Network Admin": "/dashboard/network-admin",
-      "SOC Analyst": "/dashboard/soc-analyst",
-      "Security Engineer": "/dashboard/security-engineer",
-      "Incident Responder": "/dashboard/incident-responder",
-      Auditor: "/dashboard/auditor",
-    };
-
-    const targetRoute = dashboardRoutes[role];
-
-    if (targetRoute) {
-      navigate(targetRoute);
-    } else {
-      navigate("/");
-    }
->>>>>>> origin/main
   };
 
   return (
