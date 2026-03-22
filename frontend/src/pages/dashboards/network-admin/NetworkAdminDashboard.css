@@ -282,7 +282,11 @@ a.dashboard-logo-container:active {
   font-size: 15px;
   font-weight: 600;
   font-family: Tahoma, sans-serif;
-  transition: transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    background-color 0.3s ease,
+    box-shadow 0.3s ease,
+    color 0.3s ease;
   background: transparent;
 }
 
@@ -295,13 +299,25 @@ a.dashboard-logo-container:active {
 }
 
 .admin-dashboard-page.light .sidebar-link:hover {
-  background-color: #f1f5f9;
+  background-color: rgba(200, 164, 79, 0.16);
   transform: translateY(-2px);
 }
 
 .admin-dashboard-page.dark .sidebar-link:hover {
-  background-color: #334155;
+  background-color: rgba(200, 164, 79, 0.2);
   transform: translateY(-2px);
+}
+
+.admin-dashboard-page.light .sidebar-link.active {
+  background-color: #c8a44f;
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(200, 164, 79, 0.25);
+}
+
+.admin-dashboard-page.dark .sidebar-link.active {
+  background-color: #c8a44f;
+  color: #0f172a;
+  box-shadow: 0 8px 20px rgba(200, 164, 79, 0.25);
 }
 
 .sidebar-icon {

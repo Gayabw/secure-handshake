@@ -1,4 +1,5 @@
 import "./IncidentResonderDashboard.css";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   FaSun,
   FaMoon,
@@ -13,6 +14,12 @@ import {
 import { MdDashboard, MdOutlineSecurity } from "react-icons/md";
 import logo from "../../../assets/logo.png";
 import { useNavigate, Link } from "react-router-dom";
+import {
+  fetchMetricsOverview,
+  fetchEventLogs,
+  fetchAnomalies,
+} from "../../../services/dashboardService";
+import { clearLoggedInUser } from "../../../services/authService";
 
 type IncidentResponderDashboardProps = {
   theme: "light" | "dark";
@@ -28,7 +35,12 @@ type ActiveIncident = {
   time: string;
 };
 
-const sidebarItems = [
+type SidebarItem = {
+  label: string;
+  icon: ReactNode;
+};
+
+const sidebarItems: SidebarItem[] = [
   { label: "Overview", icon: <MdDashboard /> },
   { label: "Active Incidents", icon: <FaBell /> },
   { label: "Threat Response", icon: <FaBolt /> },
@@ -39,33 +51,35 @@ const sidebarItems = [
   { label: "Security Status", icon: <FaShieldAlt /> },
 ];
 
-const statCards = [
-  { title: "Open Incidents", value: "11" },
-  { title: "Critical Cases", value: "03" },
-  { title: "Resolved Today", value: "14" },
-  { title: "Containment Rate", value: "94%" },
-];
+function formatRelativeTime(value: string | null | undefined): string {
+  if (!value) return "Recently";
 
-const activeIncidents: ActiveIncident[] = [
-  {
-    id: 1,
-    message: "Replay-based intrusion pattern detected on Node H14",
-    severity: "critical",
-    time: "3 mins ago",
-  },
-  {
-    id: 2,
-    message: "Multiple failed handshake attempts from external peer",
-    severity: "high",
-    time: "9 mins ago",
-  },
-  {
-    id: 3,
-    message: "Suspicious verification delay reported in node cluster",
-    severity: "medium",
-    time: "21 mins ago",
-  },
-];
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} mins ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hrs ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} days ago`;
+}
+
+function mapIncidentSeverity(value: string | null | undefined): IncidentSeverity {
+  const normalized = String(value || "").toLowerCase();
+
+  if (normalized === "critical") return "critical";
+  if (normalized === "high") return "high";
+  return "medium";
+}
 
 function IncidentResponderDashboard({
   theme,
@@ -73,9 +87,116 @@ function IncidentResponderDashboard({
 }: IncidentResponderDashboardProps) {
   const navigate = useNavigate();
 
+  const [metricsOverview, setMetricsOverview] = useState<any>(null);
+  const [eventLogs, setEventLogs] = useState<any[]>([]);
+  const [anomalies, setAnomalies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const handleLogout = () => {
-    navigate("/roles");
+    clearLoggedInUser();
+    navigate("/role-selection", { replace: true });
   };
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const orgId = 1;
+
+        const [metricsResponse, eventLogsResponse, anomaliesResponse] =
+          await Promise.all([
+            fetchMetricsOverview(orgId),
+            fetchEventLogs(orgId, 10),
+            fetchAnomalies(orgId, 10),
+          ]);
+
+        setMetricsOverview(metricsResponse?.data || null);
+        setEventLogs(
+          Array.isArray(eventLogsResponse?.items) ? eventLogsResponse.items : []
+        );
+        setAnomalies(
+          Array.isArray(anomaliesResponse?.items) ? anomaliesResponse.items : []
+        );
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.error || "Failed to load dashboard data."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+  }, []);
+
+  const statCards = useMemo(() => {
+    const counts = metricsOverview?.counts || {};
+    const openIncidents = anomalies.length;
+    const criticalCases = anomalies.filter((item) =>
+      ["critical", "high"].includes(String(item?.severity || "").toLowerCase())
+    ).length;
+    const resolvedToday = Math.max(0, (counts.handshakes ?? 0) - openIncidents);
+
+    const containmentRate =
+      counts.handshakes && counts.handshakes > 0
+        ? `${Math.max(
+            0,
+            Math.min(
+              100,
+              Math.round((resolvedToday / counts.handshakes) * 100)
+            )
+          )}%`
+        : "0%";
+
+    return [
+      { title: "Open Incidents", value: String(openIncidents) },
+      { title: "Critical Cases", value: String(criticalCases) },
+      { title: "Resolved Today", value: String(resolvedToday) },
+      { title: "Containment Rate", value: containmentRate },
+    ];
+  }, [metricsOverview, anomalies]);
+
+  const activeIncidents: ActiveIncident[] = useMemo(() => {
+    if (anomalies.length > 0) {
+      return anomalies.slice(0, 3).map((item, index) => ({
+        id: Number(item?.anomaly_id ?? index + 1),
+        message:
+          item?.anomaly_type ||
+          item?.description ||
+          item?.status ||
+          "Active security incident detected",
+        severity: mapIncidentSeverity(item?.severity),
+        time: formatRelativeTime(item?.detected_at),
+      }));
+    }
+
+    return eventLogs.slice(0, 3).map((item, index) => ({
+      id: Number(item?.event_log_id ?? item?.id ?? index + 1),
+      message:
+        item?.event_type ||
+        item?.details?.message ||
+        item?.log_level ||
+        "Security response event recorded",
+      severity: "medium",
+      time: formatRelativeTime(item?.event_time),
+    }));
+  }, [anomalies, eventLogs]);
+
+  const responseSummary = useMemo(() => {
+    const criticalCases = anomalies.filter((item) =>
+      ["critical", "high"].includes(String(item?.severity || "").toLowerCase())
+    ).length;
+
+    return [
+      `Open anomaly cases currently tracked: ${anomalies.length}.`,
+      `Critical or high-risk incidents requiring escalation: ${criticalCases}.`,
+      `Recent security events available for triage review: ${eventLogs.length}.`,
+      "Containment and response evidence remains available for team coordination.",
+    ];
+  }, [anomalies, eventLogs]);
 
   return (
     <div className={`incident-responder-dashboard-page ${theme}`}>
@@ -130,7 +251,10 @@ function IncidentResponderDashboard({
             <ul className="incident-responder-sidebar-menu">
               {sidebarItems.map((item) => (
                 <li key={item.label}>
-                  <button type="button" className="incident-responder-sidebar-link">
+                  <button
+                    type="button"
+                    className="incident-responder-sidebar-link"
+                  >
                     <span className="incident-responder-sidebar-icon">
                       {item.icon}
                     </span>
@@ -150,52 +274,62 @@ function IncidentResponderDashboard({
             <h1>Incident Responder Dashboard</h1>
           </div>
 
-          <section className="incident-responder-stats-grid">
-            {statCards.map((card) => (
-              <article
-                key={card.title}
-                className="incident-responder-card incident-responder-stat-card"
-              >
-                <h3>{card.title}</h3>
-                <p>{card.value}</p>
-              </article>
-            ))}
-          </section>
+          {loading && <p>Loading dashboard data...</p>}
+          {error && <p style={{ color: "red" }}>{error}</p>}
 
-          <section className="incident-responder-grid incident-responder-grid-two">
-            <article className="incident-responder-card incident-responder-info-card">
-              <h3>Active Incidents</h3>
-
-              <div className="incident-list">
-                {activeIncidents.map((incident) => (
-                  <div
-                    key={incident.id}
-                    className={`incident-item ${incident.severity}`}
+          {!loading && !error && (
+            <>
+              <section className="incident-responder-stats-grid">
+                {statCards.map((card) => (
+                  <article
+                    key={card.title}
+                    className="incident-responder-card incident-responder-stat-card"
                   >
-                    <div className="incident-content">
-                      <p className="incident-message">{incident.message}</p>
-                      <span className="incident-time">{incident.time}</span>
-                    </div>
-
-                    <span className="incident-badge">
-                      {incident.severity.toUpperCase()}
-                    </span>
-                  </div>
+                    <h3>{card.title}</h3>
+                    <p>{card.value}</p>
+                  </article>
                 ))}
-              </div>
-            </article>
+              </section>
 
-            <article className="incident-responder-card incident-responder-info-card">
-              <h3>Response Summary</h3>
+              <section className="incident-responder-grid incident-responder-grid-two">
+                <article className="incident-responder-card incident-responder-info-card">
+                  <h3>Active Incidents</h3>
 
-              <ul className="response-summary-list">
-                <li>Critical alerts are prioritized for rapid containment.</li>
-                <li>Incident evidence is being preserved for investigation.</li>
-                <li>Escalation paths are active for high-risk node activity.</li>
-                <li>Response reports are prepared for security review teams.</li>
-              </ul>
-            </article>
-          </section>
+                  <div className="incident-list">
+                    {activeIncidents.length > 0 ? (
+                      activeIncidents.map((incident) => (
+                        <div
+                          key={incident.id}
+                          className={`incident-item ${incident.severity}`}
+                        >
+                          <div className="incident-content">
+                            <p className="incident-message">{incident.message}</p>
+                            <span className="incident-time">{incident.time}</span>
+                          </div>
+
+                          <span className="incident-badge">
+                            {incident.severity.toUpperCase()}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p>No active incidents found.</p>
+                    )}
+                  </div>
+                </article>
+
+                <article className="incident-responder-card incident-responder-info-card">
+                  <h3>Response Summary</h3>
+
+                  <ul className="response-summary-list">
+                    {responseSummary.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              </section>
+            </>
+          )}
         </section>
       </main>
 

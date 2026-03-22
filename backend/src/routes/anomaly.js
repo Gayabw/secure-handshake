@@ -137,4 +137,34 @@ router.get("/list", async (req, res) => {
   }
 });
 
+router.get("/:anomalyId", async (req, res) => {
+  try {
+    const anomalyId = parsePositiveInt(req.params.anomalyId);
+
+    if (!anomalyId) {
+      return res.status(400).json({ ok: false, error: "Invalid anomaly ID" });
+    }
+
+    const { data, error } = await supabase
+      .from(TABLES.ANOMALIES)
+      .select("*")
+      .eq("anomaly_id", anomalyId)
+      .single();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ ok: false, error: "Anomaly not found" });
+    }
+
+    return res.json({ ok: true, item: data });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ ok: false, error: e?.message || "Internal server error" });
+  }
+});
+
 export default router;

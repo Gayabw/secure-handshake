@@ -1,54 +1,51 @@
 import { useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FaSun, FaMoon } from "react-icons/fa";
-import logo from "../assets/logo.png";
-import footerPattern from "../assets/footer-bg.png";
+import { getLoggedInUser } from "../services/authService";
+import logo from "../assets/Logo.png";
 
 type OTPVerificationProps = {
   theme: "light" | "dark";
   toggleTheme: () => void;
 };
 
-type OTPState = {
-  email?: string;
-  role?: string;
+type OTPPageState = {
+  staff_email?: string;
+  staff_role?: string;
+  redirect?: string;
 };
 
 function OTPVerification({ theme, toggleTheme }: OTPVerificationProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = (location.state as OTPState) || {};
+
+  const state = (location.state || {}) as OTPPageState;
+  const storedUser = getLoggedInUser();
 
   const [otp, setOtp] = useState("");
-
-  const email = state.email || "";
-  const role = state.role || "User";
-
-  const normalizedRole = role.trim().toLowerCase();
+  const [error, setError] = useState("");
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (otp.length !== 6) return;
-
-    const dashboardRoutes: Record<string, string> = {
-      "network admin": "/dashboard/network-admin",
-      "soc analyst": "/dashboard/soc-analyst",
-      "soc analyst 01": "/dashboard/soc-analyst",
-      "soc analyst 02": "/dashboard/soc-analyst",
-      "security engineer": "/dashboard/security-engineer",
-      "incident responder": "/dashboard/incident-responder",
-      auditor: "/dashboard/auditor",
-    };
-
-    const targetRoute = dashboardRoutes[normalizedRole];
-
-    if (targetRoute) {
-      navigate(targetRoute);
+    if (!otp.trim()) {
+      setError("Please enter the 6-digit OTP.");
       return;
     }
 
-    navigate("/");
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError("OTP must be exactly 6 digits.");
+      return;
+    }
+
+    const redirectPath = state.redirect || storedUser?.redirect;
+
+    if (!redirectPath) {
+      setError("Missing redirect path. Please login again.");
+      return;
+    }
+
+    navigate(redirectPath, { replace: true });
   };
 
   return (
@@ -56,9 +53,7 @@ function OTPVerification({ theme, toggleTheme }: OTPVerificationProps) {
       <nav>
         <div className="logo-container">
           <img src={logo} alt="BlockShield Logo" className="logo" />
-          <div>
-            <h2>BlockShield</h2>
-          </div>
+          <h2>BlockShield</h2>
         </div>
 
         <button type="button" className="theme-toggle" onClick={toggleTheme}>
@@ -75,64 +70,49 @@ function OTPVerification({ theme, toggleTheme }: OTPVerificationProps) {
               </>
             )}
           </span>
-
           <span className="theme-toggle-right">›</span>
         </button>
       </nav>
 
-      <main className="login-page">
-        <section className="login-card otp-card">
-          <div className="login-card-header">
-            <p className="login-role-label">{role}</p>
-            <h1>OTP Verification</h1>
-            <p className="login-description">
-              Enter the one-time password sent to your registered email address.
-            </p>
-          </div>
-
-          <div className="otp-user-info">
-            <p>
-              <strong>Email:</strong> {email || "No email provided"}
-            </p>
-          </div>
-
-          <form className="login-form" onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="otp-code">Enter OTP</label>
-              <input
-                id="otp-code"
-                name="otp_code"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="Enter 6-digit OTP"
-                value={otp}
-                onChange={(e) =>
-                  setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                }
-                required
-              />
+      <main>
+        <section className="login-page">
+          <div className="login-card otp-card">
+            <div className="login-card-header">
+              <p className="login-role-label">OTP Verification</p>
+              <h1>Verify Access</h1>
+              <p className="login-description">
+                Enter the 6-digit OTP to continue to your dashboard.
+              </p>
             </div>
 
-            <div className="login-actions">
-              <button type="submit" className="login-submit-btn">
-                Verify OTP
-              </button>
-
-              <Link to="/roles" className="back-to-roles-link">
-                Back to Login
-              </Link>
+            <div className="otp-user-info">
+              {state.staff_email || storedUser?.staff_email || "No email found"}
             </div>
-          </form>
+
+            {error && <p style={{ color: "red" }}>{error}</p>}
+
+            <form className="login-form" onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label htmlFor="otp-code">OTP Code</label>
+                <input
+                  id="otp-code"
+                  type="text"
+                  maxLength={6}
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                />
+              </div>
+
+              <div className="login-actions">
+                <button type="submit" className="login-submit-btn">
+                  Verify OTP
+                </button>
+              </div>
+            </form>
+          </div>
         </section>
       </main>
-
-      <footer
-        className="footer"
-        style={{ backgroundImage: `url(${footerPattern})` }}
-      >
-        <p>© 2026 BlockShield. All rights reserved.</p>
-      </footer>
     </div>
   );
 }

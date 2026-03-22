@@ -1,0 +1,250 @@
+.na-detail-page {
+  min-height: 100vh;
+}
+
+.na-detail-main {
+  padding: 140px 32px 40px;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.na-detail-container {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.na-detail-header {
+  margin-bottom: 24px;
+}
+
+.na-detail-role-pill {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.na-detail-header h1 {
+  font-size: 56px;
+  line-height: 1.05;
+  margin-bottom: 14px;
+}
+
+.na-detail-back-link {
+  display: inline-block;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  margin-bottom: 8px;
+}
+
+.na-detail-refresh-note {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.na-detail-card {
+  width: 100%;
+  border-radius: 24px;
+  padding: 24px;
+  overflow: hidden;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.08);
+}
+
+.na-detail-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.na-detail-table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+}
+
+.na-detail-table thead th {
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  border-bottom: 1px solid #cbd5e1;
+  white-space: nowrap;
+}
+
+.na-detail-table tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+  font-size: 14px;
+}
+
+.na-detail-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.na-raw-pre {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 440px;
+}
+
+.na-empty-state {
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.na-status-error {
+  color: red;
+  margin: 12px 0 20px;
+}
+
+.na-status-loading {
+  margin: 12px 0 20px;
+}
+
+.detail-action-btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+.app.light .na-detail-role-pill {
+  color: #c79a00;
+}
+
+.app.light .na-detail-header h1 {
+  color: #1f2937;
+}
+
+.app.light .na-detail-back-link {
+  color: #334155;
+}
+
+.app.light .na-detail-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(212, 175, 55, 0.28);
+}
+
+.app.light .detail-action-btn {
+  background-color: #334155;
+  color: #ffffff;
+}
+
+.app.light .detail-action-btn:hover {
+  background-color: #1e293b;
+}
+
+.app.dark .na-detail-role-pill {
+  color: #f5b800;
+}
+
+.app.dark .na-detail-header h1 {
+  color: #f8fafc;
+}
+
+.app.dark .na-detail-back-link {
+  color: #f8fafc;
+}
+
+.app.dark .na-detail-card {
+  background: rgba(30, 41, 59, 0.92);
+  border: 1px solid rgba(245, 184, 0, 0.24);
+}
+
+.app.dark .na-detail-table thead th,
+.app.dark .na-detail-table tbody td {
+  border-color: #334155;
+}
+
+.app.dark .detail-action-btn {
+  background-color: #f5b800;
+  color: #0f172a;
+}
+
+.app.dark .detail-action-btn:hover {
+  background-color: #d9a600;
+}
+
+@media (max-width: 900px) {
+  .na-detail-main {
+    padding: 130px 16px 30px;
+  }
+
+  .na-detail-header h1 {
+    font-size: 40px;
+  }
+
+  .na-detail-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+}
+
+/* Show More button (link-style) */
+.na-show-more-btn {
+  background: none;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-align: center;
+}
+
+/* Light mode */
+.app.light .na-show-more-btn {
+  color: #6b21a8;
+}
+
+.app.light .na-show-more-btn:hover {
+  color: #4c1d95;
+  text-decoration: underline;
+}
+
+/* Dark mode */
+.app.dark .na-show-more-btn {
+  color: #a78bfa;
+}
+
+.app.dark .na-show-more-btn:hover {
+  color: #c4b5fd;
+  text-decoration: underline;
+}
+.na-show-more-btn {
+  background: none;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.admin-dashboard-page.light .na-show-more-btn {
+  color: #6b21a8;
+}
+
+.admin-dashboard-page.light .na-show-more-btn:hover {
+  color: #4c1d95;
+}
+
+.admin-dashboard-page.dark .na-show-more-btn {
+  color: #a78bfa;
+}
+
+.admin-dashboard-page.dark .na-show-more-btn:hover {
+  color: #c4b5fd;
+}

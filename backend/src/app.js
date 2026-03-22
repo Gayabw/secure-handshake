@@ -9,8 +9,10 @@ import anomalyRoutes from "./routes/anomaly.js";
 import behaviourRoutes from "./routes/behaviour.js";
 import eventLogsRoutes from "./routes/eventLogs.js";
 import replayAttacksRoutes from "./routes/replayAttacks.js";
+import securityEventsRoutes from "./routes/securityEvents.js";
 import devRoutes from "./routes/dev.js";
 import otpRoutes from "./routes/otpRoutes.js";
+import authRoutes from "./routes/auth.js";
 import demoWalletRoutes from "./routes/demoWallet.js";
 import aliasRoutes from "./routes/aliases.js";
 import metricsRoutes from "./routes/metrics.js";
@@ -44,16 +46,18 @@ export function createApp() {
 
   app.use("/db", db);
   app.use("/handshake", handshake);
-  app.use("/", monitoring);
   app.use("/anomaly", anomalyRoutes);
   app.use("/behaviour", behaviourRoutes);
   app.use("/event-logs", eventLogsRoutes);
   app.use("/replay-attacks", replayAttacksRoutes);
+  app.use("/security-events", securityEventsRoutes);
+  app.use("/metrics", metricsRoutes);
+  app.use("/otp", otpRoutes);
+  app.use("/auth", authRoutes);
+  app.use("/", monitoring);
   app.use("/dev", devRoutes);
   app.use("/demo", demoWalletRoutes);
   app.use("/", aliasRoutes);
-  app.use("/metrics", metricsRoutes);
-  app.use("/otp", otpRoutes);
 
   app.use((_req, res) => {
     return res.status(404).json({

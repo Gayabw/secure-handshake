@@ -12,7 +12,27 @@ function parsePositiveInt(value) {
   return n;
 }
 
-/* ROUTES (READ ONLY)  */
+/* LIST ROUTE */
+// GET /behaviour/profiles?limit=100
+router.get("/profiles", async (req, res) => {
+  try {
+    const limit = parsePositiveInt(req.query.limit) ?? 100;
+
+    const { data, error } = await supabase
+      .from(TABLES.BEHAVIOR_PROFILES)
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: error.message });
+    }
+
+    return res.json({ ok: true, items: data ?? [] });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 /*
  GET /behaviour/profile/:user_id/:user_key_id
@@ -21,7 +41,7 @@ function parsePositiveInt(value) {
   - latest anomalies (top 10)
   - latest replay attacks (top 10)
   - last correlation logs (top 5)
- */
+*/
 router.get("/profile/:user_id/:user_key_id", async (req, res) => {
   try {
     const user_id = parsePositiveInt(req.params.user_id);
@@ -34,7 +54,6 @@ router.get("/profile/:user_id/:user_key_id", async (req, res) => {
       });
     }
 
-    // 1) Profile
     const { data: profile, error: pErr } = await supabase
       .from(TABLES.BEHAVIOR_PROFILES)
       .select("*")
@@ -44,7 +63,6 @@ router.get("/profile/:user_id/:user_key_id", async (req, res) => {
 
     if (pErr) return res.status(500).json({ ok: false, error: pErr.message });
 
-    // 2) Latest anomalies (top 10)
     const { data: anomalies, error: aErr } = await supabase
       .from(TABLES.ANOMALIES)
       .select(
@@ -57,7 +75,6 @@ router.get("/profile/:user_id/:user_key_id", async (req, res) => {
 
     if (aErr) return res.status(500).json({ ok: false, error: aErr.message });
 
-    // 3) Latest replay attacks (top 10)
     const { data: replays, error: rErr } = await supabase
       .from(TABLES.REPLAY_ATTACKS)
       .select(
@@ -70,8 +87,6 @@ router.get("/profile/:user_id/:user_key_id", async (req, res) => {
 
     if (rErr) return res.status(500).json({ ok: false, error: rErr.message });
 
-    // 4) Latest BEHAVIOR_CORRELATED logs for this subject (top 5)
-    
     const { data: correlations, error: cErr } = await supabase
       .from(TABLES.EVENT_LOGS)
       .select("event_log_id, handshake_id, created_at, details")

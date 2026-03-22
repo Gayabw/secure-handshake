@@ -5,6 +5,7 @@ import { requireFields } from "../utils/validate.js";
 import { runPlugins } from "../plugins/pluginRunner.js";
 import { assertNodeNotBlocked } from "../services/enforcementGateService.js";
 import { writeLog } from "../services/logService.js";
+import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
@@ -25,9 +26,104 @@ function parsePositiveInt(value) {
   return n;
 }
 
+/* LIST HANDSHAKES
+   Staff dashboard flow
+   Returns handshakes in the last N hours, default 24
+*/
+
+router.get("/", async (req, res) => {
+  try {
+    const orgId = parsePositiveInt(req.query.org_id);
+    const limit = parsePositiveInt(req.query.limit) ?? 100;
+    const hours = parsePositiveInt(req.query.hours) ?? 24;
+
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+    let query = supabase
+      .from("handshakes")
+      .select("*")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (orgId) {
+      query = query.eq("org_id", orgId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      return res.status(500).json({
+        ok: false,
+        error: "Failed to load handshake records",
+        details: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      items: data || [],
+      meta: {
+        org_id: orgId ?? null,
+        hours,
+        limit,
+      },
+    });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      error: e.message,
+    });
+  }
+});
+
+router.get("/:handshakeId", async (req, res) => {
+  try {
+    const handshakeId = parsePositiveInt(req.params.handshakeId);
+
+    if (!handshakeId) {
+      return res.status(400).json({
+        ok: false,
+        error: "Invalid handshakeId",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("handshakes")
+      .select("*")
+      .eq("handshake_id", handshakeId)
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({
+        ok: false,
+        error: "Failed to load handshake detail",
+        details: error.message,
+      });
+    }
+
+    if (!data) {
+      return res.status(404).json({
+        ok: false,
+        error: "Handshake record not found",
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      item: data,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      error: e.message,
+    });
+  }
+});
+
 /* INITIATE HANDSHAKE
    Customer node flow
-   No staff RBAC. 
+   No staff RBAC.
 */
 
 router.post("/initiate", async (req, res) => {

@@ -1,4 +1,5 @@
 import "./SOCAnalystDashboard.css";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   FaSun,
   FaMoon,
@@ -13,8 +14,14 @@ import {
 import { MdDashboard, MdOutlineVerifiedUser } from "react-icons/md";
 import logo from "../../../assets/logo.png";
 import { useNavigate, Link } from "react-router-dom";
+import {
+  fetchMetricsOverview,
+  fetchEventLogs,
+  fetchAnomalies,
+} from "../../../services/dashboardService";
+import { clearLoggedInUser } from "../../../services/authService";
 
-type NetworkAdminDashboardProps = {
+type SOCAnalystDashboardProps = {
   theme: "light" | "dark";
   toggleTheme: () => void;
 };
@@ -28,7 +35,12 @@ type RecentAlert = {
   time: string;
 };
 
-const sidebarItems = [
+type SidebarItem = {
+  label: string;
+  icon: ReactNode;
+};
+
+const sidebarItems: SidebarItem[] = [
   { label: "Overview", icon: <MdDashboard /> },
   { label: "Handshakes", icon: <FaNetworkWired /> },
   { label: "Alerts", icon: <FaBell /> },
@@ -39,43 +51,123 @@ const sidebarItems = [
   { label: "Reports", icon: <FaFileAlt /> },
 ];
 
-const statCards = [
-  { title: "Total Handshakes", value: "12,480" },
-  { title: "Active Alerts", value: "18" },
-  { title: "Critical Incidents", value: "04" },
-  { title: "Blocked Nodes", value: "27" },
-];
+function formatRelativeTime(value: string | null | undefined): string {
+  if (!value) return "Recently";
 
-const recentAlerts: RecentAlert[] = [
-  {
-    id: 1,
-    message: "Replay attack detected on Node A12",
-    severity: "critical",
-    time: "2 mins ago",
-  },
-  {
-    id: 2,
-    message: "Suspicious peer discovery on Node C07",
-    severity: "high",
-    time: "10 mins ago",
-  },
-  {
-    id: 3,
-    message: "Unauthorized connection blocked (Node X21)",
-    severity: "medium",
-    time: "25 mins ago",
-  },
-];
+  const date = new Date(value);
 
-function NetworkAdminDashboard({
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} mins ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hrs ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} days ago`;
+}
+
+function mapSeverity(value: string | null | undefined): AlertSeverity {
+  const normalized = String(value || "").toLowerCase();
+
+  if (normalized === "critical") return "critical";
+  if (normalized === "high") return "high";
+  return "medium";
+}
+
+function SOCAnalystDashboard({
   theme,
   toggleTheme,
-}: NetworkAdminDashboardProps) {
+}: SOCAnalystDashboardProps) {
   const navigate = useNavigate();
 
+  const [metricsOverview, setMetricsOverview] = useState<any>(null);
+  const [eventLogs, setEventLogs] = useState<any[]>([]);
+  const [anomalies, setAnomalies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const handleLogout = () => {
-    navigate("/roles");
+    clearLoggedInUser();
+    navigate("/role-selection", { replace: true });
   };
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const orgId = 1;
+
+        const [metricsResponse, eventLogsResponse, anomaliesResponse] =
+          await Promise.all([
+            fetchMetricsOverview(orgId),
+            fetchEventLogs(orgId, 10),
+            fetchAnomalies(orgId, 10),
+          ]);
+
+        setMetricsOverview(metricsResponse?.data || null);
+        setEventLogs(
+          Array.isArray(eventLogsResponse?.items) ? eventLogsResponse.items : []
+        );
+        setAnomalies(
+          Array.isArray(anomaliesResponse?.items) ? anomaliesResponse.items : []
+        );
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.error || "Failed to load dashboard data."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+  }, []);
+
+  const statCards = useMemo(() => {
+    const counts = metricsOverview?.counts || {};
+
+    return [
+      { title: "24h Handshakes", value: String(counts.handshakes ?? 0) },
+      { title: "Replay Attacks", value: String(counts.replay_attacks ?? 0) },
+      { title: "Open Anomalies", value: String(counts.anomalies ?? 0) },
+      { title: "Recent Event Logs", value: String(eventLogs.length) },
+    ];
+  }, [metricsOverview, eventLogs]);
+
+  const recentAlerts: RecentAlert[] = useMemo(() => {
+    if (anomalies.length > 0) {
+      return anomalies.slice(0, 3).map((item, index) => ({
+        id: Number(item?.anomaly_id ?? index + 1),
+        message:
+          item?.anomaly_type ||
+          item?.description ||
+          item?.status ||
+          "Security anomaly detected",
+        severity: mapSeverity(item?.severity),
+        time: formatRelativeTime(item?.detected_at),
+      }));
+    }
+
+    return eventLogs.slice(0, 3).map((item, index) => ({
+      id: Number(item?.event_log_id ?? item?.id ?? index + 1),
+      message:
+        item?.event_type ||
+        item?.details?.message ||
+        item?.log_level ||
+        "New security event recorded",
+      severity: "medium",
+      time: formatRelativeTime(item?.event_time),
+    }));
+  }, [anomalies, eventLogs]);
 
   return (
     <div className={`admin-dashboard-page ${theme}`}>
@@ -121,7 +213,7 @@ function NetworkAdminDashboard({
       <main className="network-admin-main">
         <aside className="network-admin-sidebar">
           <div className="sidebar-top">
-            <h3>Admin Panel</h3>
+            <h3>SOC Panel</h3>
 
             <ul className="sidebar-menu">
               {sidebarItems.map((item) => (
@@ -144,38 +236,49 @@ function NetworkAdminDashboard({
             <h1>SOC Analyst Dashboard</h1>
           </div>
 
-          <section className="stats-grid">
-            {statCards.map((card) => (
-              <article key={card.title} className="dashboard-card stat-card">
-                <h3>{card.title}</h3>
-                <p>{card.value}</p>
-              </article>
-            ))}
-          </section>
+          {loading && <p>Loading dashboard data...</p>}
+          {error && <p style={{ color: "red" }}>{error}</p>}
 
-          <section className="dashboard-grid dashboard-grid-two">
-            <article className="dashboard-card info-card">
-              <h3>Recent Alerts</h3>
-
-              <div className="alerts-list">
-                {recentAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={`alert-item ${alert.severity}`}
-                  >
-                    <div className="alert-content">
-                      <p className="alert-message">{alert.message}</p>
-                      <span className="alert-time">{alert.time}</span>
-                    </div>
-
-                    <span className="alert-badge">
-                      {alert.severity.toUpperCase()}
-                    </span>
-                  </div>
+          {!loading && !error && (
+            <>
+              <section className="stats-grid">
+                {statCards.map((card) => (
+                  <article key={card.title} className="dashboard-card stat-card">
+                    <h3>{card.title}</h3>
+                    <p>{card.value}</p>
+                  </article>
                 ))}
-              </div>
-            </article>
-          </section>
+              </section>
+
+              <section className="dashboard-grid dashboard-grid-two">
+                <article className="dashboard-card info-card">
+                  <h3>Recent Alerts</h3>
+
+                  <div className="alerts-list">
+                    {recentAlerts.length > 0 ? (
+                      recentAlerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className={`alert-item ${alert.severity}`}
+                        >
+                          <div className="alert-content">
+                            <p className="alert-message">{alert.message}</p>
+                            <span className="alert-time">{alert.time}</span>
+                          </div>
+
+                          <span className="alert-badge">
+                            {alert.severity.toUpperCase()}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p>No recent alerts found.</p>
+                    )}
+                  </div>
+                </article>
+              </section>
+            </>
+          )}
         </section>
       </main>
 
@@ -190,4 +293,4 @@ function NetworkAdminDashboard({
   );
 }
 
-export default NetworkAdminDashboard;
+export default SOCAnalystDashboard;
