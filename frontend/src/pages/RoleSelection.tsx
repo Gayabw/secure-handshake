@@ -9,7 +9,7 @@ import {
   FaClipboardCheck,
 } from "react-icons/fa";
 import { MdOutlineSecurity } from "react-icons/md";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import logo from "../assets/Logo.png";
 import bgImage from "../assets/bg-image.png";
 
@@ -98,12 +98,12 @@ function RoleSelection({ theme, toggleTheme }: RoleSelectionProps) {
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       <nav>
-        <div className="logo-container">
+        <Link to="/" className="logo-container">
           <img src={logo} alt="BlockShield Logo" className="logo" />
           <h2>BlockShield</h2>
-        </div>
+        </Link>
 
-        <button className="theme-toggle" onClick={toggleTheme}>
+        <button type="button" className="theme-toggle" onClick={toggleTheme}>
           <span className="theme-toggle-left">
             {theme === "light" ? (
               <>
@@ -123,6 +123,14 @@ function RoleSelection({ theme, toggleTheme }: RoleSelectionProps) {
       </nav>
 
       <main>
+        <section className="role-header">
+          <h1>Select Your Role</h1>
+          <p>
+            Choose your access level to continue securely into the BlockShield
+            platform.
+          </p>
+        </section>
+
         <section className="role-section compact-role-section">
           <div className="compact-role-layout">
             {roles.map((role) => (

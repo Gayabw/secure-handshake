@@ -64,13 +64,13 @@ function LoginFormLayout({
   return (
     <div className={`app ${theme}`}>
       <nav>
-        <div className="logo-container">
+        {/* ✅ FIXED: clickable logo (same as dashboard) */}
+        <Link to="/" className="logo-container">
           <img src={logo} alt="BlockShield Logo" className="logo" />
           <div>
             <h2>BlockShield</h2>
-            <p className="brand-subtitle">Secure Handshake Platform</p>
           </div>
-        </div>
+        </Link>
 
         <button type="button" className="theme-toggle" onClick={toggleTheme}>
           <span className="theme-toggle-left">

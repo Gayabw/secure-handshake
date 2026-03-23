@@ -208,10 +208,17 @@ nav::after {
   );
 }
 
-.logo-container {
+.logo-container,
+.logo-container:visited,
+.logo-container:hover,
+.logo-container:active {
   display: flex;
   align-items: center;
   gap: 15px;
+  min-width: 0;
+  text-decoration: none !important;
+  color: inherit !important;
+  cursor: pointer;
 }
 
 .logo {
