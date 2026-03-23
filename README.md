@@ -85,11 +85,11 @@ This exposes systems to threats such as:
 
 ## Project Structure
 secure-handshake/
-│
-├── backend/        # Backend APIs and security logic
-├── frontend/       # React frontend application
-├── demo/           # Wallet signing demo
-├── README.md
+
+backend/        # Backend APIs and security logic
+frontend/       # React frontend application
+demo/           # Wallet signing demo
+README.md
 
 
 ## Getting Started
@@ -118,13 +118,20 @@ npm run dev
 Frontend: http://localhost:5173
 Backend:  http://localhost:4000 
 
+
 ## Sample .env file. 
 PORT=4000
+
 SUPABASE_URL = your_project_supabase.co
+
 SUPABASE_SERVICE_ROLE_KEY = your_service_role_key
+
 JWT_SECRET=CHANGE_THIS_LATER
+
 FRONTEND_URL=http://localhost:5173
+
 OTP_TTL_MINUTES=5
+
 REPLAY_TTL_SECONDS=300
 ANOMALY_DEDUPE_MINUTES=15
 ANOMALY_THRESHOLD=70
