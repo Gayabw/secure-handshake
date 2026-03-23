@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <link rel="icon" href="data:,">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Secure Handshake Wallet Signing Demo</title>
   <style>
@@ -97,76 +98,76 @@
   </div>
 
   <script type="module">
-    import { BrowserProvider } from "https://esm.sh/ethers@6.16.0";
+  import { BrowserProvider } from "https://esm.sh/ethers@6.16.0";
 
-    let provider = null;
-    let signer = null;
-    let currentAddress = null;
+  let provider = null;
+  let signer = null;
+  let currentAddress = null;
 
-    const statusEl = document.getElementById("status");
-    const addressOutput = document.getElementById("addressOutput");
-    const chainOutput = document.getElementById("chainOutput");
-    const messageOutput = document.getElementById("messageOutput");
-    const signatureOutput = document.getElementById("signatureOutput");
+  const statusEl = document.getElementById("status");
+  const addressOutput = document.getElementById("addressOutput");
+  const chainOutput = document.getElementById("chainOutput");
+  const messageOutput = document.getElementById("messageOutput");
+  const signatureOutput = document.getElementById("signatureOutput");
 
-    document.getElementById("connectBtn").addEventListener("click", connectWallet);
-    document.getElementById("signBtn").addEventListener("click", signProof);
+  document.getElementById("connectBtn").addEventListener("click", connectWallet);
+  document.getElementById("signBtn").addEventListener("click", signProof);
 
-    async function connectWallet() {
-      try {
-        if (!window.ethereum) {
-          throw new Error("MetaMask is not installed");
-        }
+  async function connectWallet() {
+    try {
+      if (!window.ethereum) {
+        throw new Error("MetaMask is not installed");
+      }
 
-        provider = new BrowserProvider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = await provider.getSigner();
+      provider = new BrowserProvider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = await provider.getSigner();
 
-        currentAddress = await signer.getAddress();
-        const network = await provider.getNetwork();
-        const chainId = Number(network.chainId);
+      currentAddress = await signer.getAddress();
+      const network = await provider.getNetwork();
+      const chainId = Number(network.chainId);
 
-        statusEl.textContent = "Connected";
-        statusEl.className = "success";
-        addressOutput.textContent = currentAddress;
-        chainOutput.textContent = String(chainId);
+      statusEl.textContent = "Connected";
+      statusEl.className = "success";
+      addressOutput.textContent = currentAddress;
+      chainOutput.textContent = String(chainId);
 
-        if (chainId !== 11155111) {
-          statusEl.textContent = "Connected, but not on Sepolia";
-          statusEl.className = "error";
-        }
-      } catch (error) {
-        statusEl.textContent = error.message;
+      if (chainId !== 11155111) {
+        statusEl.textContent = "Connected, but not on Sepolia";
         statusEl.className = "error";
       }
+    } catch (error) {
+      statusEl.textContent = error.message;
+      statusEl.className = "error";
     }
+  }
 
-    async function signProof() {
-      try {
-        if (!signer || !currentAddress) {
-          throw new Error("Connect MetaMask first");
-        }
-
-        const payload = {
-          demo_type: "secure_handshake_identity_proof",
-          wallet_address: currentAddress,
-          purpose: "Pre-connection blockchain node identity proof",
-          issued_at: new Date().toISOString()
-        };
-
-        const message = JSON.stringify(payload, null, 2);
-        const signature = await signer.signMessage(message);
-
-        messageOutput.textContent = message;
-        signatureOutput.textContent = signature;
-
-        statusEl.textContent = "Message signed successfully";
-        statusEl.className = "success";
-      } catch (error) {
-        statusEl.textContent = error.message;
-        statusEl.className = "error";
+  async function signProof() {
+    try {
+      if (!signer || !currentAddress) {
+        throw new Error("Connect MetaMask first");
       }
+
+      const payload = {
+        demo_type: "secure_handshake_identity_proof",
+        wallet_address: currentAddress,
+        purpose: "Pre-connection blockchain node identity proof",
+        issued_at: new Date().toISOString()
+      };
+
+      const message = JSON.stringify(payload);
+      const signature = await signer.signMessage(message);
+
+      messageOutput.textContent = message;
+      signatureOutput.textContent = signature;
+
+      statusEl.textContent = "Message signed successfully";
+      statusEl.className = "success";
+    } catch (error) {
+      statusEl.textContent = error.message;
+      statusEl.className = "error";
     }
-  </script>
+  }
+</script>
 </body>
 </html>
