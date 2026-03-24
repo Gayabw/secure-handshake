@@ -1,196 +1,225 @@
+# 🔐 Secure Handshake - BlockShield  
+### Strengthening Blockchain Node Authentication  
 
-#  Secure Handshake - BlockShield
+---
 
-### Strengthening Blockchain Node Authentication
+## 📌 Overview  
 
-## 📌 Overview
+**Secure Handshake** is a final-year cybersecurity project designed to enhance the security of blockchain node communication during the **handshake phase**.  
 
-**Secure Handshake** is a final-year cybersecurity project designed to enhance the security of blockchain node communication during the **handshake phase**.
-The system introduces an additional security layer that prevents unauthorized access, detects malicious behavior, and ensures trust between nodes before communication begins.
+The system introduces an additional security layer that prevents unauthorized access, detects malicious behavior, and ensures trust between nodes before communication begins.  
 
+---
 
-##  Problem Statement
-Traditional blockchain networks allow nodes to establish connections during the handshake phase without strong identity verification.
+## 🚨 Problem Statement  
 
-This exposes systems to threats such as:
+Traditional blockchain networks allow nodes to establish connections during the handshake phase without strong identity verification.  
 
-* Node impersonation
-* Replay attacks
-* Unauthorized network access
-* Malicious node injection
+This exposes systems to threats such as:  
 
+- Node impersonation  
+- Replay attacks  
+- Unauthorized network access  
+- Malicious node injection  
 
-## Objectives
-* Strengthen node authentication during handshake
-* Prevent replay and impersonation attacks
-* Implement secure login with OTP verification
-* Enforce Role-Based Access Control (RBAC)
-* Provide real-time monitoring and anomaly detection
-* Visualize system activity through dashboards
+---
 
+## 🎯 Objectives  
 
+- Strengthen node authentication during handshake  
+- Prevent replay and impersonation attacks  
+- Implement secure login with OTP verification  
+- Enforce Role-Based Access Control (RBAC)  
+- Provide real-time monitoring and anomaly detection  
+- Visualize system activity through dashboards  
 
-##  Key Features
-### Authentication & Access Control
+---
 
-* Secure login system
-* OTP-based verification
-* Role-Based Access Control (RBAC)
+## ⚙️ Key Features  
 
-### Secure Handshake Mechanism
+### 🔑 Authentication & Access Control  
+- Secure login system  
+- OTP-based verification  
+- Role-Based Access Control (RBAC)  
 
-* Node identity validation
-* Protection against replay attacks
-* Pre-connection verification layer
+### 🔗 Secure Handshake Mechanism  
+- Node identity validation  
+- Protection against replay attacks  
+- Pre-connection verification layer  
 
-### Monitoring & Detection
+### 📊 Monitoring & Detection  
+- Real-time event logging  
+- Anomaly detection system  
+- Alert and monitoring dashboards  
 
-* Real-time event logging
-* Anomaly detection system
-* Alert and monitoring dashboards
+### 🖥️ Interactive Frontend  
+- Role-based dashboards  
+- Clean UI with theme support  
+- Login → OTP → Dashboard workflow  
 
-### Interactive Frontend
+### 🧪 Demo Module  
+- Wallet signing demonstration  
+- Simulated blockchain interaction  
 
-* Role-based dashboards
-* Clean UI with theme support
-* Login → OTP → Dashboard workflow
+---
 
-### Demo Module
+## 🧰 Tech Stack  
 
-* Wallet signing demonstration
-* Simulated blockchain interaction
+### Frontend  
+- React  
+- Vite  
+- TypeScript  
+- CSS  
 
+### Backend  
+- Node.js  
+- Express  
 
+### Other Tools  
+- Git & GitHub  
+- REST APIs  
+- Blockchain test environment (simulated/demo)  
 
-## Tech Stack
-### Frontend
+---
 
-* React
-* Vite
-* TypeScript
-* CSS
+## 📁 Project Structure  
 
-### Backend
-
-* Node.js
-* Express
-
-### Other Tools
-
-* Git & GitHub
-* REST APIs
-* Blockchain test environment (simulated/demo)
-
-
-
-## Project Structure
+```
 secure-handshake/
+│
+├── backend/        # Backend APIs and security logic
+├── frontend/       # React frontend application
+├── demo/           # Wallet signing demo
+├── docs/           # (Optional) screenshots, diagrams
+└── README.md
+```
 
-backend/        # Backend APIs and security logic
-frontend/       # React frontend application
-demo/           # Wallet signing demo
-README.md
+---
 
+## 🚀 Getting Started  
 
-## Getting Started
-### Prerequisites
+### 🔹 Prerequisites  
 
-* Node.js (v18 or higher)
-* npm (v9 or higher)
-* Git
+- Node.js (v18 or higher)  
+- npm (v9 or higher)  
+- Git  
 
+---
 
-### Run Backend
+### 🔹 Run Backend  
 
+```bash
 cd backend
 npm install
 npm start
+```
 
-### Run Frontend
+---
 
-bash
+### 🔹 Run Frontend  
+
+```bash
 cd frontend
 npm install
 npm run dev
+```
 
+---
 
-### Access Application
-Frontend: http://localhost:5173
-Backend:  http://localhost:4000 
+### 🔹 Access Application  
 
+```
+Frontend: http://localhost:5173  
+Backend:  http://localhost:4000  
+```
 
-## Sample .env file. 
+---
+
+## 🔧 Environment Configuration (.env)
+
+Create a `.env` file inside the `backend` folder:
+
+```env
 PORT=4000
 
-SUPABASE_URL = your_project_supabase.co
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
-SUPABASE_SERVICE_ROLE_KEY = your_service_role_key
-
-JWT_SECRET=CHANGE_THIS_LATER
+JWT_SECRET=your_jwt_secret_here
 
 FRONTEND_URL=http://localhost:5173
 
 OTP_TTL_MINUTES=5
-
 REPLAY_TTL_SECONDS=300
 ANOMALY_DEDUPE_MINUTES=15
 ANOMALY_THRESHOLD=70
 SYSTEM_ENFORCEMENT_USER_ID=1
+
 REPLAY_AUTO_BLOCK_THRESHOLD=3
 REPLAY_BLOCK_DURATION_MINUTES=60
+
 ANOMALY_AUTO_BLOCK_THRESHOLD=90
 ANOMALY_BLOCK_DURATION_MINUTES=30
 
-OTP_PEPPER="change_me_to_a_long_random_secret"
+OTP_PEPPER=your_long_random_secret
+
 DEV_OTP_ECHO=true
 OTP_DEFAULT_TTL_SECONDS=300
 OTP_DEFAULT_MAX_ATTEMPTS=5
 OTP_CLEANUP_ENABLED=true
 OTP_CLEANUP_INTERVAL_SECONDS=120
 OTP_DELIVERY_MODE=dev
+```
 
-
-
-## System Flow
-
-
-Home → Role Selection → Login → OTP Verification → Dashboard → Monitoring
-
-
-## Security Contributions
-
-This project enhances blockchain security by:
-
-* Adding a secure **pre-handshake validation layer**
-* Preventing replay attacks using verification logic
-* Introducing OTP-based identity confirmation
-* Enforcing strict access control through RBAC
-* Providing visibility through monitoring dashboards
-
-
-
-## Team
-
-* Member 1 - Amaya Weerawardhana
-* Member 2 - Devdini Weerasinghe
-* Member 3 - Thulshi Rasunika
-* Member 4 - Gayathmee Kiveka
-* Member 5 - Minsadhi Edirisinghe
-
-
-
-##  Academic Note
-
-This project was developed as part of the **Bachelor of Information Technology (Cybersecurity specialization)** and is intended for academic and educational purposes.
-
-
-**License**
-This repository is provided for **academic use only**.
-
-
-## Final Note
-
-Secure Handshake demonstrates how traditional blockchain communication can be strengthened by introducing modern security mechanisms at the earliest stage of connection — the handshake.
 
 ---
 
+## 🔄 System Flow  
+
+```
+Home → Role Selection → Login → OTP Verification → Dashboard → Monitoring
+```
+
+---
+
+
+
+## 🔐 Security Contributions  
+
+This project enhances blockchain security by:  
+
+- Adding a secure **pre-handshake validation layer**  
+- Preventing replay attacks using verification logic  
+- Introducing OTP-based identity confirmation  
+- Enforcing strict access control through RBAC  
+- Providing visibility through monitoring dashboards  
+
+---
+
+## 👨‍💻 Team  
+
+- Amaya Weerawardhana  
+- Devdini Weerasinghe  
+- Thulshi Rasunika  
+- Gayathmee Kiveka  
+- Minsadhi Edirisinghe  
+
+---
+
+## 🎓 Academic Note  
+
+This project was developed as part of the **Bachelor of Information Technology (Cybersecurity specialization)** and is intended for academic and educational purposes.  
+
+---
+
+## 📄 License  
+
+This repository is provided for **academic use only**.  
+
+---
+
+## ⭐ Final Note  
+
+Secure Handshake demonstrates how traditional blockchain communication can be strengthened by introducing modern security mechanisms at the earliest stage of connection — the handshake.  
+
+---
