@@ -184,6 +184,9 @@ Home → Role Selection → Login → OTP Verification → Dashboard → Monitor
 
 ## 🖥️ System Interface
 
+![BlockShield Home Page](./assets/BlockShield_HomePage.png)
+*Figure 1: The BlockShield central dashboard, featuring the secure handshake portal and real-time anomaly monitoring.*
+
 ## 🔐 Security Contributions  
 
 This project enhances blockchain security by:  
