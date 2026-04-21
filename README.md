@@ -187,6 +187,8 @@ Home → Role Selection → Login → OTP Verification → Dashboard → Monitor
 ![BlockShield Home Page](./assets/BlockShield_HomePage.png)
 *Figure 1: The BlockShield central dashboard, featuring the secure handshake portal and real-time anomaly monitoring.*
 
+---
+
 ## 🔐 Security Contributions  
 
 This project enhances blockchain security by:  
@@ -199,6 +201,15 @@ This project enhances blockchain security by:
 
 ---
 
+## 🛠️ My Contribution
+
+- Developed the core logic for the OTP Authentication Module, including OTP generation, validation, expiry handling, and attempt limits  
+- Designed and implemented the Replay Attack Detection module using nonce and timestamp validation mechanisms  
+- Created and executed API-level test cases (Thunder Client) to validate module behavior and security controls  
+- Contributed to technical documentation, including system workflows and module-level explanations
+
+---
+
 ## 👨‍💻 Team  
 
 - Amaya Weerawardhana  
@@ -208,13 +219,6 @@ This project enhances blockchain security by:
 - Minsadhi Edirisinghe  
 
 ---
-
-## My Contribution
-
-- Developed the core logic for the OTP Authentication Module, including OTP generation, validation, expiry handling, and attempt limits  
-- Designed and implemented the Replay Attack Detection module using nonce and timestamp validation mechanisms  
-- Created and executed API-level test cases (Thunder Client) to validate module behavior and security controls  
-- Contributed to technical documentation, including system workflows and module-level explanations
 
 ## 🎓 Academic Note  
 
